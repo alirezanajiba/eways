@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f6f7fb">
   <title>مدیریت ویدئوهای ایویز</title>
-  <link rel="stylesheet" href="/assets/admin.css?v=2">
+  <link rel="stylesheet" href="/assets/admin.css?v=3">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
