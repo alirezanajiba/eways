@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/app.css?v=1">
+  <link rel="stylesheet" href="/assets/app.css?v=2">
 </head>
 <body>
   <main class="app">
@@ -28,6 +28,12 @@
       <div class="empty-state" id="saved-empty"><div>♡</div><h2>هنوز چیزی ذخیره نکردی</h2><p>از داخل ویدئوها، محصولات مورد علاقه ات را ذخیره کن.</p></div>
     </section>
 
+    <section class="standard-page categories-page" id="categories-page">
+      <header class="page-head"><div><small>خرید سریع تر</small><h1>دسته بندی محصولات</h1></div></header>
+      <div class="category-list" id="category-list"></div>
+      <div class="empty-state hidden" id="category-empty"><div>⌗</div><h2>هنوز دسته بندی ثبت نشده</h2><p>به زودی دسته بندی محصولات اینجا نمایش داده می شود.</p></div>
+    </section>
+
     <section class="standard-page" id="cart-page">
       <header class="page-head"><h1>سبد خرید</h1><button class="text-btn" id="clear-cart">پاک کردن</button></header>
       <div class="card-list" id="cart-list"></div>
@@ -39,9 +45,10 @@
     </section>
 
     <nav class="bottom-nav">
-      <button class="nav-btn active" data-page="feed"><span>▶</span><small>ویدئوها</small></button>
-      <button class="nav-btn" data-page="saved"><span>♡</span><small>ذخیره شده</small></button>
-      <button class="nav-btn cart-nav" data-page="cart"><span>▢</span><i id="cart-badge">۰</i><small>سبد خرید</small></button>
+      <button class="nav-btn active" data-page="feed" aria-label="ویدئوها"><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/></svg></span><small>ویدئوها</small></button>
+      <button class="nav-btn" data-page="categories" aria-label="دسته بندی"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span><small>دسته بندی</small></button>
+      <button class="nav-btn" data-page="saved" aria-label="ذخیره شده"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z"/></svg></span><small>ذخیره شده</small></button>
+      <button class="nav-btn cart-nav" data-page="cart" aria-label="سبد خرید"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2 11h10l3-8H7"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg></span><i id="cart-badge">۰</i><small>سبد خرید</small></button>
     </nav>
 
     <div class="backdrop" id="backdrop"></div>
@@ -74,7 +81,10 @@
   <template id="video-template">
     <article class="video-slide">
       <video class="product-video" loop muted playsinline preload="metadata"></video>
-      <button class="sound-btn" aria-label="فعال کردن صدا">⌁</button>
+      <div class="video-controls">
+        <button class="play-btn" aria-label="توقف ویدئو"><svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg></button>
+        <button class="sound-btn" aria-label="فعال کردن صدا"><svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z"/><path class="sound-wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/><path class="mute-cross" d="m16 9 5 6m0-6-5 6"/></svg></button>
+      </div>
       <div class="autoplay-hint">برای پخش لمس کنید</div>
       <div class="deal-timer hidden"><small>زمان باقی مانده سفارش</small><strong>۰۰:۰۰:۰۰</strong></div>
       <div class="side-actions">
@@ -95,7 +105,6 @@
     </article>
   </template>
 
-  <script src="/assets/app.js?v=1" defer></script>
+  <script src="/assets/app.js?v=2" defer></script>
 </body>
 </html>
-

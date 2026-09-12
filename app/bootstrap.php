@@ -51,9 +51,23 @@ function migrate(PDO $pdo): void
     }
 
     $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS categories (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_category_name (name),
+            INDEX idx_category_order (is_active, sort_order, id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
         "CREATE TABLE IF NOT EXISTS videos (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             product_code VARCHAR(100) DEFAULT NULL,
+            category_id BIGINT UNSIGNED DEFAULT NULL,
             title VARCHAR(255) NOT NULL,
             description TEXT DEFAULT NULL,
             brand VARCHAR(120) DEFAULT NULL,
@@ -68,9 +82,15 @@ function migrate(PDO $pdo): void
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_category_id (category_id),
             INDEX idx_active_order (is_active, sort_order, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    $categoryColumn = $pdo->query("SHOW COLUMNS FROM videos LIKE 'category_id'")->fetch();
+    if (!$categoryColumn) {
+        $pdo->exec("ALTER TABLE videos ADD COLUMN category_id BIGINT UNSIGNED DEFAULT NULL AFTER product_code, ADD INDEX idx_category_id (category_id)");
+    }
 
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS comments (

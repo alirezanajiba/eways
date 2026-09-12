@@ -1,5 +1,6 @@
 const fa = new Intl.NumberFormat('fa-IR');
 let videos = [];
+let categories = [];
 let deleteId = null;
 const loginShell = document.getElementById('login-shell');
 const dashboard = document.getElementById('dashboard');
@@ -31,7 +32,7 @@ async function init() {
   try {
     const data = await request('/api.php?action=admin-status');
     showAuthenticated(data.authenticated);
-    if (data.authenticated) await loadVideos();
+    if (data.authenticated) await Promise.all([loadCategories(), loadVideos()]);
   } catch {
     showAuthenticated(false);
   }
@@ -54,7 +55,7 @@ document.getElementById('login-form').onsubmit = async event => {
       body: JSON.stringify(values)
     });
     showAuthenticated(true);
-    await loadVideos();
+    await Promise.all([loadCategories(), loadVideos()]);
   } catch (error) {
     message.textContent = error.message;
   }
@@ -71,6 +72,85 @@ async function loadVideos() {
   renderVideos();
 }
 
+async function loadCategories() {
+  const data = await request('/api.php?action=admin-categories');
+  categories = data.categories;
+  renderCategories();
+  renderCategorySelect();
+}
+
+function renderCategorySelect(selected = '') {
+  const select = document.getElementById('product-category');
+  select.innerHTML = '<option value="">بدون دسته بندی</option>' + categories.map(category =>
+    '<option value="' + category.id + '">' + escapeHtml(category.name) + (Number(category.is_active) ? '' : ' (غیرفعال)') + '</option>'
+  ).join('');
+  select.value = selected || '';
+}
+
+function renderCategories() {
+  const list = document.getElementById('category-admin-list');
+  list.innerHTML = categories.length ? categories.map(category =>
+    '<article class="category-admin-row" data-id="' + category.id + '">' +
+      '<span class="category-mark">⌗</span><div><b>' + escapeHtml(category.name) + '</b><small>' + fa.format(category.products_count || 0) + ' محصول · ترتیب ' + fa.format(category.sort_order || 0) + '</small></div>' +
+      '<span class="status ' + (Number(category.is_active) ? '' : 'off') + '">' + (Number(category.is_active) ? 'فعال' : 'غیرفعال') + '</span>' +
+      '<button class="category-edit" type="button">ویرایش</button><button class="category-delete" type="button">حذف</button></article>'
+  ).join('') : '<p class="category-empty">هنوز دسته بندی ثبت نشده است.</p>';
+  list.querySelectorAll('.category-edit').forEach(button => button.onclick = () => editCategory(categories.find(c => String(c.id) === button.closest('article').dataset.id)));
+  list.querySelectorAll('.category-delete').forEach(button => button.onclick = () => deleteCategory(button.closest('article').dataset.id));
+}
+
+function editCategory(category) {
+  const categoryForm = document.getElementById('category-form');
+  categoryForm.elements.id.value = category.id;
+  categoryForm.elements.name.value = category.name;
+  categoryForm.elements.sort_order.value = category.sort_order;
+  categoryForm.elements.is_active.checked = Number(category.is_active) === 1;
+  document.getElementById('category-cancel').classList.remove('hidden');
+  categoryForm.elements.name.focus({ preventScroll: true });
+}
+
+function resetCategoryForm() {
+  const categoryForm = document.getElementById('category-form');
+  categoryForm.reset();
+  categoryForm.elements.id.value = '';
+  categoryForm.elements.sort_order.value = '0';
+  categoryForm.elements.is_active.checked = true;
+  document.getElementById('category-cancel').classList.add('hidden');
+}
+
+document.getElementById('category-form').onsubmit = async event => {
+  event.preventDefault();
+  try {
+    await request('/api.php?action=admin-category-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))
+    });
+    resetCategoryForm();
+    await Promise.all([loadCategories(), loadVideos()]);
+    toast('دسته بندی ذخیره شد');
+  } catch (error) {
+    toast(error.message);
+  }
+};
+
+document.getElementById('category-cancel').onclick = resetCategoryForm;
+
+async function deleteCategory(id) {
+  if (!window.confirm('این دسته بندی حذف شود؟')) return;
+  try {
+    await request('/api.php?action=admin-category-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    await loadCategories();
+    toast('دسته بندی حذف شد');
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 function renderVideos() {
   const list = document.getElementById('video-list');
   document.getElementById('total-count').textContent = fa.format(videos.length);
@@ -82,7 +162,7 @@ function renderVideos() {
       : '<video src="' + escapeHtml(video.video_path) + '" muted playsinline preload="metadata"></video>';
     return '<article class="video-row" data-id="' + video.id + '">' +
       media +
-      '<div class="video-info"><h3>' + escapeHtml(video.title) + '</h3><p>' + escapeHtml(video.brand || 'بدون برند') + ' · موجودی ' + fa.format(video.stock_remaining) + ' عدد</p><strong>' + fa.format(video.price) + ' تومان</strong></div>' +
+      '<div class="video-info"><h3>' + escapeHtml(video.title) + '</h3><p>' + escapeHtml(video.category_name || 'بدون دسته بندی') + ' · ' + escapeHtml(video.brand || 'بدون برند') + ' · موجودی ' + fa.format(video.stock_remaining) + ' عدد</p><strong>' + fa.format(video.price) + ' تومان</strong></div>' +
       '<div class="row-actions"><span class="status ' + (Number(video.is_active) ? '' : 'off') + '">' + (Number(video.is_active) ? 'فعال' : 'غیرفعال') + '</span><button class="edit-btn">ویرایش</button><button class="delete-btn">حذف</button></div>' +
       '</article>';
   }).join('');
@@ -92,6 +172,7 @@ function renderVideos() {
 
 function openEditor(video = null) {
   form.reset();
+  renderCategorySelect(video?.category_id || '');
   form.elements.is_active.checked = true;
   document.getElementById('save-message').textContent = '';
   document.getElementById('upload-progress').classList.add('hidden');
@@ -185,4 +266,3 @@ document.getElementById('confirm-delete').onclick = async () => {
 };
 
 init();
-

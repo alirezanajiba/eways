@@ -2,13 +2,13 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f6f7fb">
   <title>مدیریت ویدئوهای ایویز</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/admin.css?v=1">
+  <link rel="stylesheet" href="/assets/admin.css?v=2">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
@@ -35,6 +35,19 @@
       <button id="new-video-btn">+ افزودن ویدئوی جدید</button>
     </section>
 
+    <section class="content category-manager">
+      <div class="list-head"><div><small>ساختار فروشگاه</small><h2>مدیریت دسته بندی ها</h2></div><span>دسته بندی ها در اپ نمایش داده می شوند</span></div>
+      <form class="category-form" id="category-form">
+        <input type="hidden" name="id">
+        <label>نام دسته بندی<input name="name" type="text" maxlength="120" required placeholder="مثلا لوازم جانبی موبایل"></label>
+        <label>ترتیب نمایش<input name="sort_order" type="number" value="0"></label>
+        <label class="category-active"><input name="is_active" type="checkbox" value="1" checked> نمایش در اپ</label>
+        <button type="submit">ذخیره دسته بندی</button>
+        <button type="button" class="category-cancel hidden" id="category-cancel">انصراف</button>
+      </form>
+      <div class="category-admin-list" id="category-admin-list"></div>
+    </section>
+
     <section class="content">
       <div class="list-head"><h2>ویدئوهای ثبت شده</h2><span>برای ویرایش روی هر ردیف کلیک کنید</span></div>
       <div class="video-list" id="video-list"></div>
@@ -50,6 +63,7 @@
       <div class="field-grid">
         <label class="full">عنوان محصول<span>*</span><input name="title" maxlength="255" required placeholder="مثلا هدفون بی سیم JBQ مدل H68"></label>
         <label>کد محصول<input name="product_code" maxlength="100" placeholder="SKU یا کد ایویز"></label>
+        <label>دسته بندی<select name="category_id" id="product-category"><option value="">بدون دسته بندی</option></select></label>
         <label>برند<input name="brand" maxlength="120" placeholder="مثلا JBQ"></label>
         <label>قیمت فروش (تومان)<input name="price" type="number" min="0" step="1" required></label>
         <label>زمان ارسال<input name="shipping_text" maxlength="160" placeholder="مثلا ارسال امروز"></label>
@@ -88,7 +102,6 @@
     <div><h3>حذف ویدئو؟</h3><p>فایل ویدئو، کاور و کامنت های آن برای همیشه حذف می شوند.</p><div><button id="cancel-delete">انصراف</button><button class="danger" id="confirm-delete">حذف شود</button></div></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/admin.js?v=1" defer></script>
+  <script src="/assets/admin.js?v=2" defer></script>
 </body>
 </html>
-

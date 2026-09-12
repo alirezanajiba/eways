@@ -9,13 +9,25 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 try {
     if ($action === 'videos' && $method === 'GET') {
         $rows = db()->query(
-            "SELECT v.*,
+            "SELECT v.*, cat.name AS category_name,
                 (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id AND c.is_approved = 1) AS comments_count
              FROM videos v
+             LEFT JOIN categories cat ON cat.id = v.category_id
              WHERE v.is_active = 1
              ORDER BY v.sort_order ASC, v.id DESC"
         )->fetchAll();
         jsonResponse(['ok' => true, 'videos' => $rows]);
+    }
+
+    if ($action === 'categories' && $method === 'GET') {
+        $rows = db()->query(
+            "SELECT c.id, c.name, c.sort_order,
+                (SELECT COUNT(*) FROM videos v WHERE v.category_id = c.id AND v.is_active = 1) AS products_count
+             FROM categories c
+             WHERE c.is_active = 1
+             ORDER BY c.sort_order ASC, c.id ASC"
+        )->fetchAll();
+        jsonResponse(['ok' => true, 'categories' => $rows]);
     }
 
     if ($action === 'comments' && $method === 'GET') {
@@ -66,8 +78,60 @@ try {
 
     if ($action === 'admin-videos' && $method === 'GET') {
         requireAdmin();
-        $rows = db()->query("SELECT * FROM videos ORDER BY sort_order ASC, id DESC")->fetchAll();
+        $rows = db()->query("SELECT v.*, c.name AS category_name FROM videos v LEFT JOIN categories c ON c.id = v.category_id ORDER BY v.sort_order ASC, v.id DESC")->fetchAll();
         jsonResponse(['ok' => true, 'videos' => $rows]);
+    }
+
+    if ($action === 'admin-categories' && $method === 'GET') {
+        requireAdmin();
+        $rows = db()->query(
+            "SELECT c.*, (SELECT COUNT(*) FROM videos v WHERE v.category_id = c.id) AS products_count
+             FROM categories c ORDER BY c.sort_order ASC, c.id ASC"
+        )->fetchAll();
+        jsonResponse(['ok' => true, 'categories' => $rows]);
+    }
+
+    if ($action === 'admin-category-save' && $method === 'POST') {
+        requireAdmin();
+        $data = requestData();
+        $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            jsonResponse(['ok' => false, 'message' => 'نام دسته بندی اجباری است.'], 422);
+        }
+        try {
+            if ($id) {
+                $stmt = db()->prepare("UPDATE categories SET name=?, sort_order=?, is_active=? WHERE id=?");
+                $stmt->execute([$name, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0, $id]);
+            } else {
+                $stmt = db()->prepare("INSERT INTO categories (name, sort_order, is_active) VALUES (?, ?, ?)");
+                $stmt->execute([$name, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0]);
+                $id = (int) db()->lastInsertId();
+            }
+        } catch (PDOException $e) {
+            if ((string) $e->getCode() === '23000') {
+                jsonResponse(['ok' => false, 'message' => 'دسته بندی دیگری با این نام وجود دارد.'], 422);
+            }
+            throw $e;
+        }
+        jsonResponse(['ok' => true, 'id' => $id, 'message' => 'دسته بندی ذخیره شد.']);
+    }
+
+    if ($action === 'admin-category-delete' && $method === 'POST') {
+        requireAdmin();
+        $data = requestData();
+        $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id) {
+            jsonResponse(['ok' => false, 'message' => 'دسته بندی نامعتبر است.'], 422);
+        }
+        $count = db()->prepare("SELECT COUNT(*) FROM videos WHERE category_id = ?");
+        $count->execute([$id]);
+        if ((int) $count->fetchColumn() > 0) {
+            jsonResponse(['ok' => false, 'message' => 'ابتدا محصولات این دسته بندی را جابجا کنید.'], 422);
+        }
+        $stmt = db()->prepare("DELETE FROM categories WHERE id = ?");
+        $stmt->execute([$id]);
+        jsonResponse(['ok' => true, 'message' => 'دسته بندی حذف شد.']);
     }
 
     if ($action === 'admin-save' && $method === 'POST') {
@@ -109,8 +173,18 @@ try {
             jsonResponse(['ok' => false, 'message' => 'انتخاب فایل ویدئو اجباری است.'], 422);
         }
 
+        $categoryId = filter_var($data['category_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+        if ($categoryId) {
+            $categoryCheck = db()->prepare("SELECT id FROM categories WHERE id = ?");
+            $categoryCheck->execute([$categoryId]);
+            if (!$categoryCheck->fetch()) {
+                jsonResponse(['ok' => false, 'message' => 'دسته بندی انتخاب شده معتبر نیست.'], 422);
+            }
+        }
+
         $values = [
             trim((string) ($data['product_code'] ?? '')) ?: null,
+            $categoryId,
             $title,
             trim((string) ($data['description'] ?? '')) ?: null,
             trim((string) ($data['brand'] ?? '')) ?: null,
@@ -127,15 +201,15 @@ try {
 
         if ($id) {
             $stmt = db()->prepare(
-                "UPDATE videos SET product_code=?, title=?, description=?, brand=?, shipping_text=?, price=?,
+                "UPDATE videos SET product_code=?, category_id=?, title=?, description=?, brand=?, shipping_text=?, price=?,
                  stock_remaining=?, stock_total=?, timer_end=?, video_path=?, poster_path=?, sort_order=?, is_active=? WHERE id=?"
             );
             $values[] = $id;
             $stmt->execute($values);
         } else {
             $stmt = db()->prepare(
-                "INSERT INTO videos (product_code,title,description,brand,shipping_text,price,stock_remaining,stock_total,timer_end,video_path,poster_path,sort_order,is_active)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "INSERT INTO videos (product_code,category_id,title,description,brand,shipping_text,price,stock_remaining,stock_total,timer_end,video_path,poster_path,sort_order,is_active)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             );
             $stmt->execute($values);
             $id = (int) db()->lastInsertId();
@@ -165,4 +239,3 @@ try {
     error_log($e->getMessage());
     jsonResponse(['ok' => false, 'message' => 'خطایی در ارتباط با سرور رخ داد.'], 500);
 }
-

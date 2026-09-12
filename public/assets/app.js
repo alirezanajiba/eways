@@ -1,6 +1,8 @@
 const fa = new Intl.NumberFormat('fa-IR');
 const state = {
   videos: [],
+  categories: [],
+  activeCategory: null,
   activeId: null,
   saved: JSON.parse(localStorage.getItem('eways_saved') || '[]'),
   cart: JSON.parse(localStorage.getItem('eways_cart') || '{}')
@@ -82,15 +84,44 @@ function buildSlide(video) {
   };
 
   const sound = node.querySelector('.sound-btn');
+  const play = node.querySelector('.play-btn');
+  const syncControls = () => {
+    play.classList.toggle('paused', player.paused);
+    play.setAttribute('aria-label', player.paused ? 'پخش ویدئو' : 'توقف ویدئو');
+    sound.classList.toggle('unmuted', !player.muted);
+    sound.setAttribute('aria-label', player.muted ? 'فعال کردن صدا' : 'بی صدا کردن ویدئو');
+  };
+  const togglePlayback = async () => {
+    if (player.paused) {
+      try {
+        await player.play();
+        node.classList.remove('needs-play');
+      } catch {
+        node.classList.add('needs-play');
+      }
+    } else {
+      player.pause();
+    }
+    syncControls();
+  };
+  play.onclick = event => {
+    event.stopPropagation();
+    togglePlayback();
+  };
   sound.onclick = () => {
     player.muted = !player.muted;
-    sound.textContent = player.muted ? '⌁' : '◖';
+    syncControls();
   };
+  player.onclick = togglePlayback;
+  player.addEventListener('play', syncControls);
+  player.addEventListener('pause', syncControls);
   node.querySelector('.autoplay-hint').onclick = async () => {
     player.muted = true;
     await player.play();
     node.classList.remove('needs-play');
+    syncControls();
   };
+  syncControls();
   return node;
 }
 
@@ -104,8 +135,10 @@ const observer = new IntersectionObserver(entries => {
       try {
         await player.play();
         entry.target.classList.remove('needs-play');
+        entry.target.querySelector('.play-btn')?.classList.remove('paused');
       } catch {
         entry.target.classList.add('needs-play');
+        entry.target.querySelector('.play-btn')?.classList.add('paused');
       }
     } else {
       player.pause();
@@ -115,26 +148,68 @@ const observer = new IntersectionObserver(entries => {
 
 async function loadVideos() {
   try {
-    const response = await fetch('/api.php?action=videos', { headers: { Accept: 'application/json' } });
-    const data = await response.json();
-    if (!data.ok) throw new Error(data.message);
+    const [videosResponse, categoriesResponse] = await Promise.all([
+      fetch('/api.php?action=videos', { headers: { Accept: 'application/json' } }),
+      fetch('/api.php?action=categories', { headers: { Accept: 'application/json' } })
+    ]);
+    const data = await videosResponse.json();
+    const categoryData = await categoriesResponse.json();
+    if (!data.ok || !categoryData.ok) throw new Error(data.message || categoryData.message);
     state.videos = data.videos;
-    feed.innerHTML = '';
+    state.categories = categoryData.categories;
+    renderFeed();
+    renderCategories();
     if (!state.videos.length) {
       feedState.innerHTML = '<h2>فعلا ویدئویی منتشر نشده</h2><p>ویدئوهای جدید به زودی اینجا نمایش داده می شوند.</p>';
       return;
     }
-    state.videos.forEach(video => {
-      const slide = buildSlide(video);
-      feed.appendChild(slide);
-      observer.observe(slide);
-    });
     feedState.classList.add('hidden');
     renderSaved();
     renderCart();
   } catch {
     feedState.innerHTML = '<h2>ارتباط برقرار نشد</h2><p>لطفا چند لحظه دیگر دوباره تلاش کنید.</p>';
   }
+}
+
+function renderFeed() {
+  document.querySelectorAll('.video-slide').forEach(slide => observer.unobserve(slide));
+  feed.innerHTML = '';
+  const visible = state.activeCategory
+    ? state.videos.filter(video => String(video.category_id) === String(state.activeCategory))
+    : state.videos;
+  visible.forEach(video => {
+    const slide = buildSlide(video);
+    feed.appendChild(slide);
+    observer.observe(slide);
+  });
+  if (state.videos.length && !visible.length) {
+    feedState.classList.remove('hidden');
+    feedState.innerHTML = '<h2>محصولی در این دسته نیست</h2><p>یک دسته بندی دیگر را انتخاب کنید.</p>';
+  } else if (visible.length) {
+    feedState.classList.add('hidden');
+  }
+}
+
+function renderCategories() {
+  const list = document.getElementById('category-list');
+  const empty = document.getElementById('category-empty');
+  empty.classList.toggle('hidden', state.categories.length > 0);
+  if (!state.categories.length) {
+    list.innerHTML = '';
+    return;
+  }
+  const cards = [{ id: '', name: 'همه محصولات', products_count: state.videos.length }, ...state.categories];
+  list.innerHTML = cards.map(category =>
+    '<button class="category-card ' + ((!state.activeCategory && !category.id) || String(state.activeCategory) === String(category.id) ? 'active' : '') + '" data-category="' + escapeHtml(category.id) + '">' +
+      '<span class="category-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span>' +
+      '<b>' + escapeHtml(category.name) + '</b><small>' + fa.format(Number(category.products_count || 0)) + ' محصول</small></button>'
+  ).join('');
+  list.querySelectorAll('.category-card').forEach(card => card.onclick = () => {
+    state.activeCategory = card.dataset.category || null;
+    renderCategories();
+    renderFeed();
+    showPage('feed');
+  });
 }
 
 function openSheet(id) {
@@ -232,7 +307,11 @@ function showPage(name) {
   document.getElementById(name + '-page').classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === name));
   if (name !== 'feed') document.querySelectorAll('.product-video').forEach(v => v.pause());
-  else document.querySelector('.video-slide')?.scrollIntoView();
+  else {
+    const active = document.querySelector('.video-slide');
+    active?.scrollIntoView();
+    active?.querySelector('video')?.play().catch(() => active?.classList.add('needs-play'));
+  }
 }
 
 function goToVideo(id) {
@@ -264,4 +343,3 @@ document.addEventListener('visibilitychange', () => {
 });
 
 loadVideos();
-
