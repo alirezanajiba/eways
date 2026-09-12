@@ -70,6 +70,7 @@ jobs:
           lftp -c "
             set ftp:ssl-force false;
             set ftp:ssl-protect-data false;
+            set ssl:verify-certificate false;
             set net:max-retries 2;
             open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_HOST\";
             cd \"${FTP_SERVER_DIR:-/}\";
