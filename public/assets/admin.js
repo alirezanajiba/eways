@@ -99,6 +99,35 @@ function renderCategories() {
   list.querySelectorAll('.category-delete').forEach(button => button.onclick = () => deleteCategory(button.closest('article').dataset.id));
 }
 
+function addTierRow(tier = {}) {
+  const rows = document.getElementById('tier-rows');
+  const row = document.createElement('div');
+  row.className = 'tier-row';
+  row.innerHTML = '<label>از تعداد<input type="number" name="tier_min_qty[]" min="1" step="1" required placeholder="مثلا ۱۰"></label>' +
+    '<label>قیمت هر واحد (تومان)<input type="number" name="tier_unit_price[]" min="1" step="1" required placeholder="مثلا ۴۲۰۰۰۰"></label>' +
+    '<button type="button" class="remove-tier" aria-label="حذف پله">×</button>';
+  row.querySelector('[name="tier_min_qty[]"]').value = tier.min_qty || '';
+  row.querySelector('[name="tier_unit_price[]"]').value = tier.unit_price || '';
+  row.querySelector('.remove-tier').onclick = () => {
+    row.remove();
+    syncTierEmpty();
+  };
+  rows.appendChild(row);
+  syncTierEmpty();
+}
+
+function syncTierEmpty() {
+  document.getElementById('tier-empty').classList.toggle('hidden', document.querySelectorAll('.tier-row').length > 0);
+}
+
+function renderTierRows(tiers = []) {
+  document.getElementById('tier-rows').innerHTML = '';
+  tiers.forEach(addTierRow);
+  syncTierEmpty();
+}
+
+document.getElementById('add-tier-btn').onclick = () => addTierRow();
+
 function editCategory(category) {
   const categoryForm = document.getElementById('category-form');
   categoryForm.elements.id.value = category.id;
@@ -173,6 +202,7 @@ function renderVideos() {
 function openEditor(video = null) {
   form.reset();
   renderCategorySelect(video?.category_id || '');
+  renderTierRows(video?.price_tiers || []);
   form.elements.is_active.checked = true;
   document.getElementById('save-message').textContent = '';
   document.getElementById('upload-progress').classList.add('hidden');

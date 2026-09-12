@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f6f7fb">
   <title>مدیریت ویدئوهای ایویز</title>
-  <link rel="stylesheet" href="/assets/admin.css?v=3">
+  <link rel="stylesheet" href="/assets/admin.css?v=4">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
@@ -71,6 +71,12 @@
         <label class="full">توضیحات محصول<textarea name="description" rows="4" placeholder="توضیحات و مشخصات مهم محصول"></textarea></label>
       </div>
 
+      <section class="tier-editor">
+        <div class="tier-head"><div><b>قیمت گذاری پلکانی</b><small>با رسیدن تعداد خرید به هر پله، قیمت واحد همان پله اعمال می شود.</small></div><button type="button" id="add-tier-btn">+ افزودن پله</button></div>
+        <div class="tier-rows" id="tier-rows"></div>
+        <p class="tier-empty" id="tier-empty">هنوز پله ای تعریف نشده و همان قیمت فروش محصول محاسبه می شود.</p>
+      </section>
+
       <div class="upload-grid">
         <label class="upload-card">
           <input type="file" name="video_file" accept="video/mp4">
@@ -99,6 +105,6 @@
     <div><h3>حذف ویدئو؟</h3><p>فایل ویدئو، کاور و کامنت های آن برای همیشه حذف می شوند.</p><div><button id="cancel-delete">انصراف</button><button class="danger" id="confirm-delete">حذف شود</button></div></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/admin.js?v=2" defer></script>
+  <script src="/assets/admin.js?v=4" defer></script>
 </body>
 </html>

@@ -6,6 +6,28 @@ require __DIR__ . '/../app/bootstrap.php';
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+function attachPriceTiers(array &$rows): void
+{
+    if (!$rows) {
+        return;
+    }
+    $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = db()->prepare("SELECT video_id, min_qty, unit_price FROM price_tiers WHERE video_id IN ($placeholders) ORDER BY min_qty ASC");
+    $stmt->execute($ids);
+    $grouped = [];
+    foreach ($stmt->fetchAll() as $tier) {
+        $grouped[(int) $tier['video_id']][] = [
+            'min_qty' => (int) $tier['min_qty'],
+            'unit_price' => (int) $tier['unit_price'],
+        ];
+    }
+    foreach ($rows as &$row) {
+        $row['price_tiers'] = $grouped[(int) $row['id']] ?? [];
+    }
+    unset($row);
+}
+
 try {
     if ($action === 'videos' && $method === 'GET') {
         $rows = db()->query(
@@ -16,6 +38,7 @@ try {
              WHERE v.is_active = 1
              ORDER BY v.sort_order ASC, v.id DESC"
         )->fetchAll();
+        attachPriceTiers($rows);
         jsonResponse(['ok' => true, 'videos' => $rows]);
     }
 
@@ -79,6 +102,7 @@ try {
     if ($action === 'admin-videos' && $method === 'GET') {
         requireAdmin();
         $rows = db()->query("SELECT v.*, c.name AS category_name FROM videos v LEFT JOIN categories c ON c.id = v.category_id ORDER BY v.sort_order ASC, v.id DESC")->fetchAll();
+        attachPriceTiers($rows);
         jsonResponse(['ok' => true, 'videos' => $rows]);
     }
 
@@ -173,6 +197,29 @@ try {
             jsonResponse(['ok' => false, 'message' => 'انتخاب فایل ویدئو اجباری است.'], 422);
         }
 
+        $tierMins = (array) ($data['tier_min_qty'] ?? []);
+        $tierPrices = (array) ($data['tier_unit_price'] ?? []);
+        $priceTiers = [];
+        foreach ($tierMins as $index => $minimum) {
+            if ($minimum === '' && ($tierPrices[$index] ?? '') === '') {
+                continue;
+            }
+            $minimum = (int) $minimum;
+            $unitPrice = (int) ($tierPrices[$index] ?? 0);
+            if ($minimum < 1 || $unitPrice < 1) {
+                jsonResponse(['ok' => false, 'message' => 'حداقل تعداد و قیمت همه پله ها باید بیشتر از صفر باشد.'], 422);
+            }
+            $priceTiers[$minimum] = $unitPrice;
+        }
+        ksort($priceTiers, SORT_NUMERIC);
+        $previousTierPrice = max(0, (int) ($data['price'] ?? 0));
+        foreach ($priceTiers as $unitPrice) {
+            if ($previousTierPrice > 0 && $unitPrice > $previousTierPrice) {
+                jsonResponse(['ok' => false, 'message' => 'قیمت هر پله باید از قیمت پله قبلی کمتر یا مساوی باشد.'], 422);
+            }
+            $previousTierPrice = $unitPrice;
+        }
+
         $categoryId = filter_var($data['category_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
         if ($categoryId) {
             $categoryCheck = db()->prepare("SELECT id FROM categories WHERE id = ?");
@@ -213,6 +260,15 @@ try {
             );
             $stmt->execute($values);
             $id = (int) db()->lastInsertId();
+        }
+
+        $deleteTiers = db()->prepare("DELETE FROM price_tiers WHERE video_id = ?");
+        $deleteTiers->execute([$id]);
+        if ($priceTiers) {
+            $insertTier = db()->prepare("INSERT INTO price_tiers (video_id, min_qty, unit_price) VALUES (?, ?, ?)");
+            foreach ($priceTiers as $minimum => $unitPrice) {
+                $insertTier->execute([$id, $minimum, $unitPrice]);
+            }
         }
         jsonResponse(['ok' => true, 'id' => $id, 'message' => 'ویدئو ذخیره شد.']);
     }

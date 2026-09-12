@@ -13,6 +13,7 @@ const template = document.getElementById('video-template');
 const feedState = document.getElementById('feed-state');
 const toastEl = document.getElementById('toast');
 const backdrop = document.getElementById('backdrop');
+let galleryRefreshMinute = Math.floor(Date.now() / 60000);
 
 function toast(message) {
   toastEl.textContent = message;
@@ -31,6 +32,19 @@ function formatPrice(value) {
   return fa.format(Number(value || 0)) + ' <small>تومان</small>';
 }
 
+function tierPrice(video, quantity) {
+  const qty = Math.max(1, Number(quantity) || 1);
+  let price = Number(video.price || 0);
+  let activeTier = null;
+  (video.price_tiers || []).forEach(tier => {
+    if (qty >= Number(tier.min_qty)) {
+      price = Number(tier.unit_price);
+      activeTier = tier;
+    }
+  });
+  return { price, activeTier };
+}
+
 function stockInfo(video) {
   const total = Number(video.stock_total || 0);
   const remaining = Number(video.stock_remaining || 0);
@@ -47,12 +61,19 @@ function buildSlide(video) {
   player.setAttribute('aria-label', video.title);
 
   node.querySelector('.product-panel h2').textContent = video.title;
-  node.querySelector('.price').innerHTML = formatPrice(video.price);
   const stock = stockInfo(video);
   node.querySelector('.stock-row span').textContent = stock.remaining ? 'فقط ' + fa.format(stock.remaining) + ' عدد باقی مانده' : 'ناموجود';
   node.querySelector('.stock-row small').textContent = fa.format(stock.sold) + '٪ فروش رفته';
   node.querySelector('.stock-bar i').style.width = stock.sold + '%';
   node.querySelector('.comments-btn small').textContent = fa.format(video.comments_count || 0);
+
+  const tierStrip = node.querySelector('.tier-strip');
+  if (video.price_tiers?.length) {
+    tierStrip.classList.remove('hidden');
+    tierStrip.innerHTML = video.price_tiers.map(tier =>
+      '<button type="button" data-tier-qty="' + Number(tier.min_qty) + '"><b>' + fa.format(Number(tier.min_qty)) + '+ عدد</b><span>' + fa.format(Number(tier.unit_price)) + '</span></button>'
+    ).join('');
+  }
 
   const timer = node.querySelector('.deal-timer');
   if (video.timer_end) {
@@ -74,13 +95,31 @@ function buildSlide(video) {
   node.querySelector('.details-btn').onclick = () => openDetails(video);
   node.querySelector('.comments-btn').onclick = () => openComments(video);
   const qtyValue = node.querySelector('.qty b');
-  node.querySelector('.minus').onclick = () => qtyValue.textContent = Math.max(1, Number(qtyValue.textContent) - 1);
-  node.querySelector('.plus').onclick = () => qtyValue.textContent = Number(qtyValue.textContent) + 1;
+  const setQuantity = value => {
+    const maximum = stock.remaining > 0 ? stock.remaining : 1;
+    const quantity = Math.max(1, Math.min(maximum, Number(value) || 1));
+    qtyValue.dataset.value = String(quantity);
+    qtyValue.textContent = fa.format(quantity);
+    const current = tierPrice(video, quantity);
+    node.querySelector('.price').innerHTML = formatPrice(current.price);
+    const note = node.querySelector('.price-tier-note');
+    note.classList.toggle('hidden', !video.price_tiers?.length);
+    note.textContent = current.activeTier
+      ? 'قیمت واحد پلکانی برای ' + fa.format(quantity) + ' عدد'
+      : 'با افزایش تعداد، قیمت واحد کمتر می شود';
+    tierStrip.querySelectorAll('button').forEach(button => button.classList.toggle('active', Number(button.dataset.tierQty) <= quantity));
+  };
+  setQuantity(1);
+  node.querySelector('.minus').onclick = () => setQuantity(Number(qtyValue.dataset.value || 1) - 1);
+  node.querySelector('.plus').onclick = () => setQuantity(Number(qtyValue.dataset.value || 1) + 1);
+  tierStrip.querySelectorAll('button').forEach(button => button.onclick = () => setQuantity(Number(button.dataset.tierQty)));
+  if (!stock.remaining) node.querySelector('.add-cart').disabled = true;
   node.querySelector('.add-cart').onclick = () => {
     const id = String(video.id);
-    state.cart[id] = (state.cart[id] || 0) + Number(qtyValue.textContent);
+    const selectedQuantity = Number(qtyValue.dataset.value || 1);
+    state.cart[id] = (Number(state.cart[id]) || 0) + selectedQuantity;
     persist();
-    toast(fa.format(Number(qtyValue.textContent)) + ' عدد به سبد اضافه شد');
+    toast(fa.format(selectedQuantity) + ' عدد به سبد اضافه شد');
   };
 
   const sound = node.querySelector('.sound-btn');
@@ -159,6 +198,7 @@ async function loadVideos() {
     state.categories = categoryData.categories;
     renderFeed();
     renderCategories();
+    renderGallery();
     if (!state.videos.length) {
       feedState.innerHTML = '<h2>فعلا ویدئویی منتشر نشده</h2><p>ویدئوهای جدید به زودی اینجا نمایش داده می شوند.</p>';
       return;
@@ -208,8 +248,47 @@ function renderCategories() {
     state.activeCategory = card.dataset.category || null;
     renderCategories();
     renderFeed();
-    showPage('feed');
+    renderGallery();
   });
+}
+
+function saleIsOpen(video) {
+  if (!video.timer_end) return true;
+  return new Date(video.timer_end.replace(' ', 'T')).getTime() > Date.now();
+}
+
+function galleryTime(video) {
+  if (!video.timer_end) return 'بدون محدودیت زمانی';
+  const left = Math.max(0, new Date(video.timer_end.replace(' ', 'T')).getTime() - Date.now());
+  const hours = Math.floor(left / 3600000);
+  const minutes = Math.floor((left % 3600000) / 60000);
+  return fa.format(hours) + ' ساعت و ' + fa.format(minutes) + ' دقیقه مانده';
+}
+
+function renderGallery() {
+  const gallery = document.getElementById('category-gallery');
+  const empty = document.getElementById('gallery-empty');
+  const category = state.categories.find(item => String(item.id) === String(state.activeCategory));
+  const videos = state.videos.filter(video => saleIsOpen(video) && (!state.activeCategory || String(video.category_id) === String(state.activeCategory)));
+  document.getElementById('gallery-title').textContent = category ? 'ویدئوهای ' + category.name : 'ویدئوهای قابل سفارش';
+  document.getElementById('gallery-count').textContent = fa.format(videos.length) + ' محصول';
+  empty.classList.toggle('hidden', videos.length > 0);
+  gallery.innerHTML = videos.map(video => {
+    const media = video.poster_path
+      ? '<img src="' + escapeHtml(video.poster_path) + '" alt="">'
+      : '<video src="' + escapeHtml(video.video_path) + '" muted playsinline preload="metadata"></video>';
+    return '<button class="gallery-card" data-gallery-video="' + video.id + '"><span class="gallery-media">' + media + '<i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg></i><small>' + escapeHtml(galleryTime(video)) + '</small></span><b>' + escapeHtml(video.title) + '</b><span>' + formatPrice(tierPrice(video, 1).price) + '</span></button>';
+  }).join('');
+  gallery.querySelectorAll('[data-gallery-video]').forEach(card => card.onclick = () => openGalleryVideo(card.dataset.galleryVideo));
+}
+
+function openGalleryVideo(id) {
+  const video = state.videos.find(item => String(item.id) === String(id));
+  if (!video) return;
+  state.activeCategory = video.category_id || null;
+  renderFeed();
+  renderCategories();
+  goToVideo(id);
 }
 
 function openSheet(id) {
@@ -284,7 +363,7 @@ function renderCart() {
   document.getElementById('cart-empty').classList.toggle('hidden', items.length > 0);
   document.getElementById('cart-summary').classList.toggle('hidden', !items.length);
   document.getElementById('cart-badge').textContent = fa.format(items.reduce((sum, x) => sum + x.qty, 0));
-  document.getElementById('cart-total').textContent = fa.format(items.reduce((sum, x) => sum + Number(x.video.price) * x.qty, 0)) + ' تومان';
+  document.getElementById('cart-total').textContent = fa.format(items.reduce((sum, x) => sum + tierPrice(x.video, x.qty).price * x.qty, 0)) + ' تومان';
   list.innerHTML = items.map(({ video, qty }) => itemCard(video, 'cart', qty)).join('');
   list.querySelectorAll('[data-remove-cart]').forEach(b => b.onclick = () => {
     delete state.cart[b.dataset.removeCart];
@@ -299,7 +378,7 @@ function itemCard(video, type, qty = 0) {
   const action = type === 'saved'
     ? '<button data-open="' + video.id + '">مشاهده ویدئو</button><button data-remove-saved="' + video.id + '">حذف</button>'
     : '<span>' + fa.format(qty) + ' عدد</span><button data-remove-cart="' + video.id + '">حذف</button>';
-  return '<article class="item-card">' + media + '<div class="info"><h3>' + escapeHtml(video.title) + '</h3><div class="item-price">' + formatPrice(video.price) + '</div><div class="item-actions">' + action + '</div></div></article>';
+  return '<article class="item-card">' + media + '<div class="info"><h3>' + escapeHtml(video.title) + '</h3><div class="item-price">' + formatPrice(tierPrice(video, qty || 1).price) + '</div><div class="item-actions">' + action + '</div></div></article>';
 }
 
 function showPage(name) {
@@ -334,6 +413,11 @@ setInterval(() => {
     const s = String(total % 60).padStart(2, '0');
     timer.querySelector('strong').textContent = (h + ':' + m + ':' + s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
   });
+  const currentMinute = Math.floor(Date.now() / 60000);
+  if (currentMinute !== galleryRefreshMinute) {
+    galleryRefreshMinute = currentMinute;
+    if (document.getElementById('categories-page').classList.contains('active')) renderGallery();
+  }
 }, 1000);
 
 document.addEventListener('visibilitychange', () => {

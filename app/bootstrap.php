@@ -93,6 +93,19 @@ function migrate(PDO $pdo): void
     }
 
     $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS price_tiers (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            video_id BIGINT UNSIGNED NOT NULL,
+            min_qty INT UNSIGNED NOT NULL,
+            unit_price BIGINT UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_video_min_qty (video_id, min_qty),
+            INDEX idx_tier_lookup (video_id, min_qty),
+            CONSTRAINT fk_price_tiers_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
         "CREATE TABLE IF NOT EXISTS comments (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             video_id BIGINT UNSIGNED NOT NULL,

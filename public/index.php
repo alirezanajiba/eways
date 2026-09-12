@@ -2,11 +2,11 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
-  <link rel="stylesheet" href="/assets/app.css?v=3">
+  <link rel="stylesheet" href="/assets/app.css?v=4">
 </head>
 <body>
   <main class="app">
@@ -29,6 +29,9 @@
       <header class="page-head"><div><small>خرید سریع تر</small><h1>دسته بندی محصولات</h1></div></header>
       <div class="category-list" id="category-list"></div>
       <div class="empty-state hidden" id="category-empty"><div>⌗</div><h2>هنوز دسته بندی ثبت نشده</h2><p>به زودی دسته بندی محصولات اینجا نمایش داده می شود.</p></div>
+      <div class="gallery-head"><div><small id="gallery-kicker">فرصت های فعال</small><h2 id="gallery-title">ویدئوهای قابل سفارش</h2></div><span id="gallery-count">۰ محصول</span></div>
+      <div class="video-gallery" id="category-gallery"></div>
+      <div class="gallery-empty hidden" id="gallery-empty">در حال حاضر ویدئوی فعالی در این دسته وجود ندارد.</div>
     </section>
 
     <section class="standard-page" id="cart-page">
@@ -92,6 +95,8 @@
         <h2></h2>
         <button class="details-btn">مشخصات و توضیحات محصول ◀</button>
         <div class="price"></div>
+        <div class="price-tier-note hidden"></div>
+        <div class="tier-strip hidden"></div>
         <div class="stock-row"><span></span><small></small></div>
         <div class="stock-bar"><i></i></div>
         <div class="buy-row">
@@ -102,6 +107,6 @@
     </article>
   </template>
 
-  <script src="/assets/app.js?v=2" defer></script>
+  <script src="/assets/app.js?v=4" defer></script>
 </body>
 </html>
