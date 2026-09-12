@@ -1,0 +1,10 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Keep certificate validation endpoints available to the hosting control panel.
+RewriteRule ^\.well-known/ - [L]
+
+# Serve the application from /public while keeping /app outside the public URL space.
+RewriteRule ^public(?:/|$) - [L]
+RewriteRule ^(.*)$ public/$1 [L]
