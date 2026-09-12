@@ -1,3 +1,5 @@
+@font-face{font-family:Vazirmatn;src:url('/assets/fonts/vazirmatn-arabic.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+200C-200E,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:Vazirmatn;src:url('/assets/fonts/vazirmatn-latin.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap;unicode-range:U+0000-00FF,U+2000-206F,U+20AC,U+FEFF,U+FFFD}
 :root{--violet:#6d5dfc;--ink:#111526;--muted:#777e91;--bg:#f6f7fb;--line:#e6e8ef;--danger:#e54858}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);font-family:Vazirmatn,Tahoma,sans-serif;color:var(--ink)}
