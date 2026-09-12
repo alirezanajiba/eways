@@ -1,0 +1,6 @@
+/app/config.local.php
+/public/media/videos/*
+!/public/media/videos/.gitkeep
+/public/media/posters/*
+!/public/media/posters/.gitkeep
+
