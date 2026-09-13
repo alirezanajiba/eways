@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
-  <link rel="stylesheet" href="/assets/app.css?v=9">
+  <link rel="stylesheet" href="/assets/app.css?v=10">
 </head>
 <body>
   <main class="app">

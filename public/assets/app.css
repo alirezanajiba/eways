@@ -84,3 +84,5 @@ button{cursor:pointer}
 
 /* Compact navigation spacing */
 .bottom-nav{height:62px;border-radius:27px;padding:5px}.nav-btn{height:50px;border-radius:22px}.nav-btn.active{border-radius:22px}.product-panel{bottom:calc(85px + env(safe-area-inset-bottom))}
+
+.wallet,.deal-timer{border-radius:27px}
