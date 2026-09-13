@@ -2,10 +2,10 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#f6f7fb">
   <title>مدیریت ویدئوهای ایویز</title>
-  <link rel="stylesheet" href="/assets/admin.css?v=4">
+  <link rel="stylesheet" href="/assets/admin.css?v=5">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
@@ -22,33 +22,45 @@
 
   <main class="dashboard hidden" id="dashboard">
     <header class="main-head">
-      <div><small>ایویز ویدئو</small><h1>مدیریت ویدئوهای محصولات</h1></div>
+      <div class="head-title"><button class="admin-back hidden" id="admin-back" aria-label="بازگشت">‹</button><div><small>ایویز ویدئو</small><h1 id="admin-page-title">صفحه مدیریت</h1></div></div>
       <div class="head-actions"><a href="/" target="_blank">مشاهده اپ</a><button id="logout-btn">خروج</button></div>
     </header>
 
-    <section class="stats">
-      <div><span>کل ویدئوها</span><b id="total-count">۰</b></div>
-      <div><span>ویدئوهای فعال</span><b id="active-count">۰</b></div>
-      <button id="new-video-btn">+ افزودن ویدئوی جدید</button>
+    <section class="admin-home" id="admin-home">
+      <section class="stats">
+        <div><span>کل ویدئوها</span><b id="total-count">۰</b></div>
+        <div><span>ویدئوهای فعال</span><b id="active-count">۰</b></div>
+        <div><span>دسته بندی ها</span><b id="category-count">۰</b></div>
+      </section>
+      <section class="manage-grid">
+        <button class="manage-card videos-card" data-admin-view="videos"><span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/></svg></span><div><b>مدیریت ویدئوها</b><small>افزودن، ویرایش، قیمت گذاری و گزارش عملکرد</small></div><i>‹</i></button>
+        <button class="manage-card categories-card" data-admin-view="categories"><span><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span><div><b>مدیریت دسته بندی ها</b><small>تعریف دسته بندی و انتخاب آیکون</small></div><i>‹</i></button>
+      </section>
     </section>
 
-    <section class="content category-manager">
-      <div class="list-head"><div><small>ساختار فروشگاه</small><h2>مدیریت دسته بندی ها</h2></div><span>دسته بندی ها در اپ نمایش داده می شوند</span></div>
-      <form class="category-form" id="category-form">
-        <input type="hidden" name="id">
-        <label>نام دسته بندی<input name="name" type="text" maxlength="120" required placeholder="مثلا لوازم جانبی موبایل"></label>
-        <label>ترتیب نمایش<input name="sort_order" type="number" value="0"></label>
-        <label class="category-active"><input name="is_active" type="checkbox" value="1" checked> نمایش در اپ</label>
-        <button type="submit">ذخیره دسته بندی</button>
-        <button type="button" class="category-cancel hidden" id="category-cancel">انصراف</button>
-      </form>
-      <div class="category-admin-list" id="category-admin-list"></div>
+    <section class="admin-view hidden" id="categories-view">
+      <section class="content category-manager">
+        <div class="list-head"><div><small>ساختار فروشگاه</small><h2>دسته بندی ها</h2></div><span>دسته بندی ها در اپ نمایش داده می شوند</span></div>
+        <form class="category-form" id="category-form">
+          <input type="hidden" name="id">
+          <input type="hidden" name="icon_key" value="grid">
+          <label>نام دسته بندی<input name="name" type="text" maxlength="120" required placeholder="مثلا لوازم جانبی موبایل"></label>
+          <label>ترتیب نمایش<input name="sort_order" type="number" value="0"></label>
+          <label class="category-active"><input name="is_active" type="checkbox" value="1" checked> نمایش در اپ</label>
+          <div class="icon-picker-wrap"><b>آیکون دسته بندی</b><div class="icon-picker" id="icon-picker"></div></div>
+          <div class="category-form-actions"><button type="submit">ذخیره دسته بندی</button><button type="button" class="category-cancel hidden" id="category-cancel">انصراف</button></div>
+        </form>
+        <div class="category-admin-list" id="category-admin-list"></div>
+      </section>
     </section>
 
-    <section class="content">
-      <div class="list-head"><h2>ویدئوهای ثبت شده</h2><span>برای ویرایش روی هر ردیف کلیک کنید</span></div>
-      <div class="video-list" id="video-list"></div>
-      <div class="empty hidden" id="admin-empty"><b>هنوز ویدئویی ثبت نشده</b><span>اولین ویدئوی محصول را اضافه کنید.</span></div>
+    <section class="admin-view hidden" id="videos-view">
+      <section class="stats video-tools"><div><span>کل ویدئوها</span><b id="view-total-count">۰</b></div><div><span>ویدئوهای فعال</span><b id="view-active-count">۰</b></div><button id="new-video-btn">+ افزودن ویدئوی جدید</button></section>
+      <section class="content">
+        <div class="list-head"><h2>ویدئوهای ثبت شده</h2><span>گزارش هر ویدئو از رفتار واقعی کاربران محاسبه می شود</span></div>
+        <div class="video-list" id="video-list"></div>
+        <div class="empty hidden" id="admin-empty"><b>هنوز ویدئویی ثبت نشده</b><span>اولین ویدئوی محصول را اضافه کنید.</span></div>
+      </section>
     </section>
   </main>
 
@@ -62,7 +74,7 @@
         <label>کد محصول<input name="product_code" maxlength="100" placeholder="SKU یا کد ایویز"></label>
         <label>دسته بندی<select name="category_id" id="product-category"><option value="">بدون دسته بندی</option></select></label>
         <label>برند<input name="brand" maxlength="120" placeholder="مثلا JBQ"></label>
-        <label>قیمت فروش (تومان)<input name="price" type="number" min="0" step="1" required></label>
+        <label>قیمت فروش (تومان)<input name="price" type="text" inputmode="numeric" class="money-input" required></label>
         <label>زمان ارسال<input name="shipping_text" maxlength="160" placeholder="مثلا ارسال امروز"></label>
         <label>موجودی باقی مانده<input name="stock_remaining" type="number" min="0" value="0"></label>
         <label>موجودی اولیه<input name="stock_total" type="number" min="0" value="0"></label>
@@ -73,6 +85,7 @@
 
       <section class="tier-editor">
         <div class="tier-head"><div><b>قیمت گذاری پلکانی</b><small>با رسیدن تعداد خرید به هر پله، قیمت واحد همان پله اعمال می شود.</small></div><button type="button" id="add-tier-btn">+ افزودن پله</button></div>
+        <div class="tier-columns"><span>از تعداد</span><span>قیمت هر واحد (تومان)</span><i></i></div>
         <div class="tier-rows" id="tier-rows"></div>
         <p class="tier-empty" id="tier-empty">هنوز پله ای تعریف نشده و همان قیمت فروش محصول محاسبه می شود.</p>
       </section>
@@ -80,13 +93,13 @@
       <div class="upload-grid">
         <label class="upload-card">
           <input type="file" name="video_file" accept="video/mp4">
-          <span class="upload-icon">▶</span>
+          <span class="upload-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg></span>
           <b>فایل ویدئو MP4</b>
           <small id="video-file-name">حداکثر حجم ۱۲۸ مگابایت</small>
         </label>
         <label class="upload-card">
           <input type="file" name="poster_file" accept="image/jpeg,image/png,image/webp">
-          <span class="upload-icon">▧</span>
+          <span class="upload-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m5 17 4-4 3 3 2-2 5 4"/></svg></span>
           <b>کاور ویدئو (اختیاری)</b>
           <small id="poster-file-name">بدون کاور هم ویدئو پخش می شود</small>
         </label>
@@ -97,7 +110,7 @@
 
       <div class="progress hidden" id="upload-progress"><i></i><span>در حال بارگذاری... ۰٪</span></div>
       <div class="form-message" id="save-message"></div>
-      <div class="editor-actions"><button type="button" class="cancel" id="cancel-editor">انصراف</button><button type="submit" class="save">ذخیره ویدئو</button></div>
+      <div class="editor-actions"><button type="submit" class="save">ذخیره ویدئو</button><button type="button" class="cancel" id="cancel-editor">انصراف</button></div>
     </form>
   </aside>
 
@@ -105,6 +118,6 @@
     <div><h3>حذف ویدئو؟</h3><p>فایل ویدئو، کاور و کامنت های آن برای همیشه حذف می شوند.</p><div><button id="cancel-delete">انصراف</button><button class="danger" id="confirm-delete">حذف شود</button></div></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/admin.js?v=4" defer></script>
+  <script src="/assets/admin.js?v=5" defer></script>
 </body>
 </html>

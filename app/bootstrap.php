@@ -54,6 +54,7 @@ function migrate(PDO $pdo): void
         "CREATE TABLE IF NOT EXISTS categories (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(120) NOT NULL,
+            icon_key VARCHAR(40) NOT NULL DEFAULT 'grid',
             sort_order INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -62,6 +63,11 @@ function migrate(PDO $pdo): void
             INDEX idx_category_order (is_active, sort_order, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    $categoryIconColumn = $pdo->query("SHOW COLUMNS FROM categories LIKE 'icon_key'")->fetch();
+    if (!$categoryIconColumn) {
+        $pdo->exec("ALTER TABLE categories ADD COLUMN icon_key VARCHAR(40) NOT NULL DEFAULT 'grid' AFTER name");
+    }
 
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS videos (
@@ -102,6 +108,60 @@ function migrate(PDO $pdo): void
             UNIQUE KEY uq_video_min_qty (video_id, min_qty),
             INDEX idx_tier_lookup (video_id, min_qty),
             CONSTRAINT fk_price_tiers_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS video_stats (
+            video_id BIGINT UNSIGNED PRIMARY KEY,
+            total_views BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT fk_video_stats_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS video_viewers (
+            video_id BIGINT UNSIGNED NOT NULL,
+            visitor_token VARCHAR(80) NOT NULL,
+            first_viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (video_id, visitor_token),
+            CONSTRAINT fk_video_viewers_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS video_saves (
+            video_id BIGINT UNSIGNED NOT NULL,
+            visitor_token VARCHAR(80) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (video_id, visitor_token),
+            CONSTRAINT fk_video_saves_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS orders (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            total_amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            status VARCHAR(30) NOT NULL DEFAULT 'registered',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_orders_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS order_items (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            order_id BIGINT UNSIGNED NOT NULL,
+            video_id BIGINT UNSIGNED NOT NULL,
+            quantity INT UNSIGNED NOT NULL,
+            unit_price BIGINT UNSIGNED NOT NULL,
+            line_total BIGINT UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_order_items_video (video_id),
+            CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            CONSTRAINT fk_order_items_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 

@@ -28,6 +28,20 @@ function attachPriceTiers(array &$rows): void
     unset($row);
 }
 
+function validVisitorToken(mixed $value): ?string
+{
+    $token = trim((string) $value);
+    return preg_match('/^[a-zA-Z0-9_-]{16,80}$/', $token) ? $token : null;
+}
+
+function serverTierPrice(PDO $pdo, int $videoId, int $quantity, int $basePrice): int
+{
+    $stmt = $pdo->prepare("SELECT unit_price FROM price_tiers WHERE video_id = ? AND min_qty <= ? ORDER BY min_qty DESC LIMIT 1");
+    $stmt->execute([$videoId, $quantity]);
+    $tierPrice = $stmt->fetchColumn();
+    return $tierPrice === false ? $basePrice : (int) $tierPrice;
+}
+
 try {
     if ($action === 'videos' && $method === 'GET') {
         $rows = db()->query(
@@ -44,13 +58,111 @@ try {
 
     if ($action === 'categories' && $method === 'GET') {
         $rows = db()->query(
-            "SELECT c.id, c.name, c.sort_order,
+            "SELECT c.id, c.name, c.icon_key, c.sort_order,
                 (SELECT COUNT(*) FROM videos v WHERE v.category_id = c.id AND v.is_active = 1) AS products_count
              FROM categories c
              WHERE c.is_active = 1
              ORDER BY c.sort_order ASC, c.id ASC"
         )->fetchAll();
         jsonResponse(['ok' => true, 'categories' => $rows]);
+    }
+
+    if ($action === 'track-view' && $method === 'POST') {
+        $data = requestData();
+        $videoId = filter_var($data['video_id'] ?? null, FILTER_VALIDATE_INT);
+        $visitorToken = validVisitorToken($data['visitor_token'] ?? null);
+        if (!$videoId || !$visitorToken) {
+            jsonResponse(['ok' => false, 'message' => 'اطلاعات بازدید نامعتبر است.'], 422);
+        }
+        $pdo = db();
+        $video = $pdo->prepare("SELECT id FROM videos WHERE id = ? AND is_active = 1");
+        $video->execute([$videoId]);
+        if (!$video->fetch()) {
+            jsonResponse(['ok' => false, 'message' => 'ویدئو پیدا نشد.'], 404);
+        }
+        $pdo->beginTransaction();
+        $stats = $pdo->prepare("INSERT INTO video_stats (video_id, total_views) VALUES (?, 1) ON DUPLICATE KEY UPDATE total_views = total_views + 1");
+        $stats->execute([$videoId]);
+        $viewer = $pdo->prepare("INSERT IGNORE INTO video_viewers (video_id, visitor_token) VALUES (?, ?)");
+        $viewer->execute([$videoId, $visitorToken]);
+        $pdo->commit();
+        jsonResponse(['ok' => true]);
+    }
+
+    if ($action === 'track-save' && $method === 'POST') {
+        $data = requestData();
+        $videoId = filter_var($data['video_id'] ?? null, FILTER_VALIDATE_INT);
+        $visitorToken = validVisitorToken($data['visitor_token'] ?? null);
+        if (!$videoId || !$visitorToken) {
+            jsonResponse(['ok' => false, 'message' => 'اطلاعات ذخیره نامعتبر است.'], 422);
+        }
+        if (!empty($data['saved'])) {
+            $stmt = db()->prepare("INSERT IGNORE INTO video_saves (video_id, visitor_token) VALUES (?, ?)");
+            $stmt->execute([$videoId, $visitorToken]);
+        } else {
+            $stmt = db()->prepare("DELETE FROM video_saves WHERE video_id = ? AND visitor_token = ?");
+            $stmt->execute([$videoId, $visitorToken]);
+        }
+        jsonResponse(['ok' => true]);
+    }
+
+    if ($action === 'order' && $method === 'POST') {
+        $data = requestData();
+        $rawItems = is_array($data['items'] ?? null) ? $data['items'] : [];
+        $requested = [];
+        foreach ($rawItems as $item) {
+            $videoId = filter_var($item['video_id'] ?? null, FILTER_VALIDATE_INT);
+            $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
+            if ($videoId && $quantity && $quantity > 0) {
+                $requested[(int) $videoId] = ($requested[(int) $videoId] ?? 0) + (int) $quantity;
+            }
+        }
+        if (!$requested) {
+            jsonResponse(['ok' => false, 'message' => 'سبد خرید خالی است.'], 422);
+        }
+
+        $pdo = db();
+        $pdo->beginTransaction();
+        $productStmt = $pdo->prepare("SELECT id, title, price, stock_remaining, is_active, timer_end FROM videos WHERE id = ? FOR UPDATE");
+        $products = [];
+        $shortages = [];
+        foreach ($requested as $videoId => $quantity) {
+            $productStmt->execute([$videoId]);
+            $product = $productStmt->fetch();
+            $available = $product && (int) $product['is_active'] === 1 && (empty($product['timer_end']) || strtotime((string) $product['timer_end']) > time())
+                ? (int) $product['stock_remaining'] : 0;
+            if (!$product || $quantity > $available) {
+                $shortages[] = [
+                    'video_id' => $videoId,
+                    'title' => $product['title'] ?? 'محصول ناموجود',
+                    'available' => $available,
+                    'requested' => $quantity,
+                ];
+                continue;
+            }
+            $unitPrice = serverTierPrice($pdo, $videoId, $quantity, (int) $product['price']);
+            $product['quantity'] = $quantity;
+            $product['unit_price'] = $unitPrice;
+            $product['line_total'] = $unitPrice * $quantity;
+            $products[] = $product;
+        }
+        if ($shortages) {
+            $pdo->rollBack();
+            jsonResponse(['ok' => false, 'message' => 'موجودی بعضی محصولات برای ثبت سفارش کافی نیست.', 'shortages' => $shortages], 409);
+        }
+
+        $total = array_sum(array_column($products, 'line_total'));
+        $orderStmt = $pdo->prepare("INSERT INTO orders (total_amount) VALUES (?)");
+        $orderStmt->execute([$total]);
+        $orderId = (int) $pdo->lastInsertId();
+        $itemStmt = $pdo->prepare("INSERT INTO order_items (order_id, video_id, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?)");
+        $stockStmt = $pdo->prepare("UPDATE videos SET stock_remaining = stock_remaining - ? WHERE id = ?");
+        foreach ($products as $product) {
+            $itemStmt->execute([$orderId, $product['id'], $product['quantity'], $product['unit_price'], $product['line_total']]);
+            $stockStmt->execute([$product['quantity'], $product['id']]);
+        }
+        $pdo->commit();
+        jsonResponse(['ok' => true, 'order_id' => $orderId, 'total_amount' => $total, 'message' => 'سفارش با موفقیت ثبت شد.']);
     }
 
     if ($action === 'comments' && $method === 'GET') {
@@ -101,7 +213,17 @@ try {
 
     if ($action === 'admin-videos' && $method === 'GET') {
         requireAdmin();
-        $rows = db()->query("SELECT v.*, c.name AS category_name FROM videos v LEFT JOIN categories c ON c.id = v.category_id ORDER BY v.sort_order ASC, v.id DESC")->fetchAll();
+        $rows = db()->query(
+            "SELECT v.*, c.name AS category_name,
+                COALESCE((SELECT s.total_views FROM video_stats s WHERE s.video_id = v.id), 0) AS total_views,
+                (SELECT COUNT(*) FROM video_viewers uv WHERE uv.video_id = v.id) AS unique_views,
+                COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.video_id = v.id), 0) AS sales_count,
+                COALESCE((SELECT SUM(oi.line_total) FROM order_items oi WHERE oi.video_id = v.id), 0) AS sales_amount,
+                (SELECT COUNT(*) FROM video_saves vs WHERE vs.video_id = v.id) AS saves_count,
+                (SELECT COUNT(*) FROM comments cm WHERE cm.video_id = v.id AND cm.is_approved = 1) AS comments_count
+             FROM videos v LEFT JOIN categories c ON c.id = v.category_id
+             ORDER BY v.sort_order ASC, v.id DESC"
+        )->fetchAll();
         attachPriceTiers($rows);
         jsonResponse(['ok' => true, 'videos' => $rows]);
     }
@@ -120,16 +242,18 @@ try {
         $data = requestData();
         $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
         $name = trim((string) ($data['name'] ?? ''));
+        $allowedIcons = ['grid','mobile','charger','headphones','speaker','battery','cable','watch','camera','computer','keyboard','mouse','gamepad','car','home','lamp','gift','bag','tools','screen','wifi','memory','printer','audio'];
+        $iconKey = in_array((string) ($data['icon_key'] ?? ''), $allowedIcons, true) ? (string) $data['icon_key'] : 'grid';
         if ($name === '') {
             jsonResponse(['ok' => false, 'message' => 'نام دسته بندی اجباری است.'], 422);
         }
         try {
             if ($id) {
-                $stmt = db()->prepare("UPDATE categories SET name=?, sort_order=?, is_active=? WHERE id=?");
-                $stmt->execute([$name, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0, $id]);
+                $stmt = db()->prepare("UPDATE categories SET name=?, icon_key=?, sort_order=?, is_active=? WHERE id=?");
+                $stmt->execute([$name, $iconKey, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0, $id]);
             } else {
-                $stmt = db()->prepare("INSERT INTO categories (name, sort_order, is_active) VALUES (?, ?, ?)");
-                $stmt->execute([$name, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0]);
+                $stmt = db()->prepare("INSERT INTO categories (name, icon_key, sort_order, is_active) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$name, $iconKey, (int) ($data['sort_order'] ?? 0), !empty($data['is_active']) ? 1 : 0]);
                 $id = (int) db()->lastInsertId();
             }
         } catch (PDOException $e) {
@@ -282,6 +406,11 @@ try {
         $row = $stmt->fetch();
         if (!$row) {
             jsonResponse(['ok' => false, 'message' => 'ویدئو پیدا نشد.'], 404);
+        }
+        $sales = db()->prepare("SELECT COUNT(*) FROM order_items WHERE video_id = ?");
+        $sales->execute([$id]);
+        if ((int) $sales->fetchColumn() > 0) {
+            jsonResponse(['ok' => false, 'message' => 'این ویدئو سابقه فروش دارد و قابل حذف نیست؛ آن را غیرفعال کنید.'], 422);
         }
         $delete = db()->prepare("DELETE FROM videos WHERE id = ?");
         $delete->execute([$id]);
