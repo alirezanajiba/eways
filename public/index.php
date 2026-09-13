@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
-  <link rel="stylesheet" href="/assets/app.css?v=7">
+  <link rel="stylesheet" href="/assets/app.css?v=8">
 </head>
 <body>
   <main class="app">
@@ -87,7 +87,7 @@
         <button class="sound-btn" aria-label="فعال کردن صدا"><svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z"/><path class="sound-wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/><path class="mute-cross" d="m16 9 5 6m0-6-5 6"/></svg></button>
       </div>
       <div class="autoplay-hint">برای پخش لمس کنید</div>
-      <div class="deal-timer hidden"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><strong>۰۰:۰۰:۰۰</strong></div>
+      <div class="deal-timer hidden"><strong>۰۰:۰۰:۰۰</strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
       <div class="side-actions">
         <button class="comments-btn" aria-label="کامنت ها"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8.5 8 9 9 0 0 1-3.7-.8L4 20l1.3-3.4A8 8 0 1 1 20 11.5Z"/><path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01"/></svg></span><small>۰</small></button>
         <button class="save-btn" aria-label="ذخیره ویدئو"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z"/></svg></span></button>
