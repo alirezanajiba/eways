@@ -43,6 +43,26 @@ function serverTierPrice(PDO $pdo, int $videoId, int $quantity, int $basePrice):
 }
 
 try {
+    if ($action === 'catalog' && $method === 'GET') {
+        $videos = db()->query(
+            "SELECT v.*, cat.name AS category_name,
+                (SELECT COUNT(*) FROM comments c WHERE c.video_id = v.id AND c.is_approved = 1) AS comments_count
+             FROM videos v
+             LEFT JOIN categories cat ON cat.id = v.category_id
+             WHERE v.is_active = 1
+             ORDER BY v.sort_order ASC, v.id DESC"
+        )->fetchAll();
+        attachPriceTiers($videos);
+        $categories = db()->query(
+            "SELECT c.id, c.name, c.icon_key, c.sort_order,
+                (SELECT COUNT(*) FROM videos v WHERE v.category_id = c.id AND v.is_active = 1) AS products_count
+             FROM categories c
+             WHERE c.is_active = 1
+             ORDER BY c.sort_order ASC, c.id ASC"
+        )->fetchAll();
+        jsonResponse(['ok' => true, 'videos' => $videos, 'categories' => $categories]);
+    }
+
     if ($action === 'videos' && $method === 'GET') {
         $rows = db()->query(
             "SELECT v.*, cat.name AS category_name,

@@ -50,6 +50,17 @@ function migrate(PDO $pdo): void
         return;
     }
 
+    // Avoid running several DDL statements on every public API request.
+    try {
+        $schemaVersion = (int) $pdo->query("SELECT meta_value FROM app_meta WHERE meta_key = 'schema_version'")->fetchColumn();
+        if ($schemaVersion >= 3) {
+            $done = true;
+            return;
+        }
+    } catch (PDOException) {
+        // The metadata table is created after the first successful migration.
+    }
+
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS categories (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -177,6 +188,15 @@ function migrate(PDO $pdo): void
             CONSTRAINT fk_comments_video FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS app_meta (
+            meta_key VARCHAR(80) PRIMARY KEY,
+            meta_value VARCHAR(255) NOT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->exec("INSERT INTO app_meta (meta_key, meta_value) VALUES ('schema_version', '3') ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)");
 
     $done = true;
 }
