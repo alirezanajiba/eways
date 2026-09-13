@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#f6f7fb">
   <title>مدیریت ویدئوهای ایویز</title>
-  <link rel="stylesheet" href="/assets/admin.css?v=5">
+  <link rel="stylesheet" href="/assets/admin.css?v=6">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
@@ -22,8 +22,8 @@
 
   <main class="dashboard hidden" id="dashboard">
     <header class="main-head">
-      <div class="head-title"><button class="admin-back hidden" id="admin-back" aria-label="بازگشت">‹</button><div><small>ایویز ویدئو</small><h1 id="admin-page-title">صفحه مدیریت</h1></div></div>
-      <div class="head-actions"><a href="/" target="_blank">مشاهده اپ</a><button id="logout-btn">خروج</button></div>
+      <div class="head-title"><div><small>ایویز ویدئو</small><h1 id="admin-page-title">صفحه مدیریت</h1></div></div>
+      <div class="head-actions"><div class="dashboard-actions" id="dashboard-actions"><a href="/" target="_blank">مشاهده اپ</a><button id="logout-btn">خروج</button></div><button class="subpage-back hidden" id="subpage-back">بازگشت</button></div>
     </header>
 
     <section class="admin-home" id="admin-home">
@@ -33,8 +33,8 @@
         <div><span>دسته بندی ها</span><b id="category-count">۰</b></div>
       </section>
       <section class="manage-grid">
-        <button class="manage-card videos-card" data-admin-view="videos"><span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/></svg></span><div><b>مدیریت ویدئوها</b><small>افزودن، ویرایش، قیمت گذاری و گزارش عملکرد</small></div><i>‹</i></button>
-        <button class="manage-card categories-card" data-admin-view="categories"><span><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span><div><b>مدیریت دسته بندی ها</b><small>تعریف دسته بندی و انتخاب آیکون</small></div><i>‹</i></button>
+        <button class="manage-card videos-card" data-admin-view="videos"><span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/></svg></span><div><b>مدیریت ویدئوها</b><small>افزودن، ویرایش، قیمت گذاری و گزارش عملکرد</small></div><i>›</i></button>
+        <button class="manage-card categories-card" data-admin-view="categories"><span><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span><div><b>مدیریت دسته بندی ها</b><small>تعریف دسته بندی و انتخاب آیکون</small></div><i>›</i></button>
       </section>
     </section>
 
@@ -76,10 +76,10 @@
         <label>برند<input name="brand" maxlength="120" placeholder="مثلا JBQ"></label>
         <label>قیمت فروش (تومان)<input name="price" type="text" inputmode="numeric" class="money-input" required></label>
         <label>زمان ارسال<input name="shipping_text" maxlength="160" placeholder="مثلا ارسال امروز"></label>
-        <label>موجودی باقی مانده<input name="stock_remaining" type="number" min="0" value="0"></label>
-        <label>موجودی اولیه<input name="stock_total" type="number" min="0" value="0"></label>
-        <label>پایان تایمر<input name="timer_end" type="datetime-local"></label>
-        <label>ترتیب نمایش<input name="sort_order" type="number" value="0"></label>
+        <label>موجودی باقیمانده<input name="stock_remaining" type="number" inputmode="numeric" min="0" value="0"></label>
+        <label>موجودی اولیه<input name="stock_total" type="number" inputmode="numeric" min="0" value="0"></label>
+        <label>پایان تایمر<input name="timer_end_display" id="timer-end-display" type="text" inputmode="none" readonly placeholder="انتخاب تاریخ و ساعت شمسی"><input name="timer_end" type="hidden"></label>
+        <label>ترتیب نمایش<input name="sort_order" type="number" inputmode="numeric" min="0" value="0"></label>
         <label class="full">توضیحات محصول<textarea name="description" rows="4" placeholder="توضیحات و مشخصات مهم محصول"></textarea></label>
       </div>
 
@@ -117,7 +117,10 @@
   <div class="confirm hidden" id="delete-confirm">
     <div><h3>حذف ویدئو؟</h3><p>فایل ویدئو، کاور و کامنت های آن برای همیشه حذف می شوند.</p><div><button id="cancel-delete">انصراف</button><button class="danger" id="confirm-delete">حذف شود</button></div></div>
   </div>
+  <div class="jalali-picker hidden" id="jalali-picker">
+    <div class="jalali-card"><div class="jalali-head"><div><small>تاریخ شمسی</small><b>پایان زمان سفارش</b></div><button type="button" id="close-jalali">×</button></div><div class="jalali-date-fields"><label>روز<select id="jalali-day"></select></label><label>ماه<select id="jalali-month"></select></label><label>سال<select id="jalali-year"></select></label></div><div class="jalali-time-fields"><label>ساعت<select id="jalali-hour"></select></label><span>:</span><label>دقیقه<select id="jalali-minute"></select></label></div><div class="jalali-actions"><button type="button" id="confirm-jalali">تایید</button><button type="button" id="clear-jalali">پاک کردن</button><button type="button" id="cancel-jalali">انصراف</button></div></div>
+  </div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/admin.js?v=5" defer></script>
+  <script src="/assets/admin.js?v=6" defer></script>
 </body>
 </html>

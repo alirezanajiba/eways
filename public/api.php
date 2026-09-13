@@ -180,9 +180,16 @@ try {
         if (!$videoId || mb_strlen($name) < 2 || mb_strlen($body) < 2) {
             jsonResponse(['ok' => false, 'message' => 'نام و متن کامنت را کامل وارد کنید.'], 422);
         }
+        $cleanName = mb_substr($name, 0, 100);
+        $cleanBody = mb_substr($body, 0, 1000);
         $stmt = db()->prepare("INSERT INTO comments (video_id, display_name, body) VALUES (?, ?, ?)");
-        $stmt->execute([$videoId, mb_substr($name, 0, 100), mb_substr($body, 0, 1000)]);
-        jsonResponse(['ok' => true, 'message' => 'کامنت ثبت شد.']);
+        $stmt->execute([$videoId, $cleanName, $cleanBody]);
+        jsonResponse(['ok' => true, 'message' => 'کامنت ثبت شد.', 'comment' => [
+            'id' => (int) db()->lastInsertId(),
+            'display_name' => $cleanName,
+            'body' => $cleanBody,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]]);
     }
 
     if ($action === 'admin-login' && $method === 'POST') {

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
-  <link rel="stylesheet" href="/assets/app.css?v=5">
+  <link rel="stylesheet" href="/assets/app.css?v=6">
 </head>
 <body>
   <main class="app">
@@ -14,7 +14,6 @@
       <div class="video-feed" id="video-feed" aria-live="polite"></div>
       <header class="topbar">
         <div class="wallet"><span class="coin">ت</span><span>سپرده<br><b>۱۸,۴۵۰,۰۰۰ تومان</b></span></div>
-        <div class="feed-tabs"><button class="active">پیشنهادی</button><button>جدیدترین</button></div>
       </header>
       <div class="feed-state" id="feed-state"><span class="loader"></span><p>در حال دریافت ویدئوها...</p></div>
     </section>
@@ -26,12 +25,12 @@
     </section>
 
     <section class="standard-page categories-page" id="categories-page">
-      <header class="page-head"><div><small>خرید سریع تر</small><h1>دسته بندی محصولات</h1></div></header>
+      <header class="page-head"><div><h1>دسته بندی محصولات</h1></div></header>
       <div class="category-list" id="category-list"></div>
       <div class="empty-state hidden" id="category-empty"><div>⌗</div><h2>هنوز دسته بندی ثبت نشده</h2><p>به زودی دسته بندی محصولات اینجا نمایش داده می شود.</p></div>
-      <div class="gallery-head"><div><small id="gallery-kicker">فرصت های فعال</small><h2 id="gallery-title">ویدئوهای قابل سفارش</h2></div><span id="gallery-count">۰ محصول</span></div>
+      <div class="gallery-head"><div><h2 id="gallery-title">ویدئوها</h2></div><span id="gallery-count">۰ محصول</span></div>
       <div class="video-gallery" id="category-gallery"></div>
-      <div class="gallery-empty hidden" id="gallery-empty">در حال حاضر ویدئوی فعالی در این دسته وجود ندارد.</div>
+      <div class="gallery-empty hidden" id="gallery-empty">در حال حاضر ویدئویی در این دسته وجود ندارد.</div>
     </section>
 
     <section class="standard-page" id="cart-page">
@@ -39,7 +38,7 @@
       <div class="card-list" id="cart-list"></div>
       <div class="empty-state" id="cart-empty"><div>□</div><h2>سبد خرید خالی است</h2><p>هنگام تماشای ویدئو، تعداد را انتخاب و به سبد اضافه کن.</p></div>
       <div class="cart-summary hidden" id="cart-summary">
-        <div><span>جمع سفارش</span><strong id="cart-total">۰ تومان</strong></div>
+        <div><span>جمع سفارش:</span><strong id="cart-total">۰ تومان</strong></div>
         <button id="submit-order">ثبت سفارش</button>
       </div>
     </section>
@@ -68,7 +67,7 @@
 
     <aside class="sheet" id="comments-sheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-head"><h2>دیدگاه ها</h2><button class="close-sheet">×</button></div>
+      <div class="sheet-head"><h2>کامنت ها</h2><button class="close-sheet">×</button></div>
       <div class="comments" id="comments-list"></div>
       <form class="comment-form" id="comment-form">
         <input name="display_name" placeholder="نام شما" maxlength="100" required>
@@ -90,12 +89,11 @@
       <div class="autoplay-hint">برای پخش لمس کنید</div>
       <div class="deal-timer hidden"><small>زمان باقی مانده سفارش</small><strong>۰۰:۰۰:۰۰</strong></div>
       <div class="side-actions">
-        <button class="comments-btn" aria-label="دیدگاه ها"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8.5 8 9 9 0 0 1-3.7-.8L4 20l1.3-3.4A8 8 0 1 1 20 11.5Z"/><path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01"/></svg></span><small>۰</small></button>
+        <button class="comments-btn" aria-label="کامنت ها"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8.5 8 9 9 0 0 1-3.7-.8L4 20l1.3-3.4A8 8 0 1 1 20 11.5Z"/><path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01"/></svg></span><small>۰</small></button>
         <button class="save-btn" aria-label="ذخیره ویدئو"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z"/></svg></span></button>
       </div>
       <div class="product-panel">
-        <h2></h2>
-        <button class="details-btn">مشخصات و توضیحات محصول <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>
+        <div class="product-title-row"><h2></h2><button class="details-btn" aria-label="اطلاعات محصول"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button></div>
         <div class="price"></div>
         <div class="price-tier-note hidden"></div>
         <div class="tier-strip hidden"></div>
@@ -103,12 +101,12 @@
         <div class="stock-bar"><i></i></div>
         <div class="buy-row">
           <div class="qty"><button class="minus">−</button><b>۱</b><button class="plus">+</button></div>
-          <button class="add-cart">افزودن به سبد</button>
+          <button class="add-cart">افزودن به سبد خرید</button>
         </div>
       </div>
     </article>
   </template>
 
-  <script src="/assets/app.js?v=5" defer></script>
+  <script src="/assets/app.js?v=6" defer></script>
 </body>
 </html>
