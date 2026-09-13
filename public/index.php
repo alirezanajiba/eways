@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
-  <link rel="stylesheet" href="/assets/app.css?v=10">
+  <link rel="stylesheet" href="/assets/app.css?v=11">
 </head>
 <body>
   <main class="app">
@@ -107,6 +107,6 @@
     </article>
   </template>
 
-  <script src="/assets/app.js?v=7" defer></script>
+  <script src="/assets/app.js?v=11" defer></script>
 </body>
 </html>
