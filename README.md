@@ -12,9 +12,13 @@
 
 Document Root سابدامین: /home/radiba/public_html/eways/public
 
-ریشه اکانت FTP انتشار: /home/radiba/public_html/eways
+ریشه موثر اکانت FTP انتشار: /home/radiba/public_html/eways/public
 
 در این حالت مقدار FTP_SERVER_DIR در GitHub Secrets برابر / است.
+
+Workflow پیش از انتشار یک بسته تخت می سازد؛ بنابراین محتویات پوشه `public`
+مستقیما در Document Root قرار می گیرند و پوشه `public/public` روی سرور ساخته نمی شود.
+کدهای خصوصی `app` نیز با قواعد دسترسی وب محافظت می شوند.
 
 ## فرمت ویدئو
 

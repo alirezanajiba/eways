@@ -1,7 +1,11 @@
 <?php
 
 declare(strict_types=1);
-require __DIR__ . '/../app/bootstrap.php';
+
+$bootstrap = is_file(__DIR__ . '/app/bootstrap.php')
+    ? __DIR__ . '/app/bootstrap.php'
+    : __DIR__ . '/../app/bootstrap.php';
+require $bootstrap;
 
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
