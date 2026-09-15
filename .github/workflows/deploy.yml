@@ -67,25 +67,6 @@ jobs:
           cp -a public/. .deploy/
           cp -a app/. .deploy/app/
 
-      - name: Download legacy media for final migration
-        run: |
-          mkdir -p .deploy/media/videos .deploy/media/posters
-          curl --fail --silent --show-error --location --retry 3 \
-            "https://eways.kharjeto.ir/api.php?action=catalog" \
-            --output /tmp/eways-legacy-catalog.json
-          jq -r '.videos[] | .video_path, .poster_path // empty' /tmp/eways-legacy-catalog.json | while IFS= read -r path; do
-            case "$path" in
-              /media/videos/*|/media/posters/*)
-                destination=".deploy${path}"
-                mkdir -p "$(dirname "$destination")"
-                curl --fail --silent --show-error --location --retry 3 \
-                  --connect-timeout 20 --max-time 600 \
-                  "https://eways.kharjeto.ir${path}" \
-                  --output "$destination"
-                ;;
-            esac
-          done
-
       - name: Deploy to cPanel
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -103,13 +84,6 @@ jobs:
             mirror --reverse --verbose --only-newer --exclude-glob media/videos/*.mp4 --exclude-glob media/posters/*.jpg --exclude-glob media/posters/*.jpeg --exclude-glob media/posters/*.png --exclude-glob media/posters/*.webp .deploy/ ./;
             mkdir -p media/videos;
             mkdir -p media/posters;
-            mirror --reverse --verbose --only-newer .deploy/media/videos/ media/videos/;
-            mirror --reverse --verbose --only-newer .deploy/media/posters/ media/posters/;
             chmod 755 media media/videos media/posters app;
-            rm -r public;
-            set cmd:fail-exit no;
-            rm README.md;
-            rm .gitignore;
-            set cmd:fail-exit yes;
             bye;
           "
