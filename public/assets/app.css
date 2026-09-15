@@ -98,3 +98,13 @@ button{cursor:pointer}
   .topbar{padding-top:13px}
   .deal-timer{top:13px}
 }
+
+/* Cart row alignment and consistently aligned category cards. */
+.cart-prices{align-items:start}
+.cart-prices>div{grid-template-rows:21px 24px;align-content:start;margin:0!important}
+.cart-prices span,.cart-prices b{display:block;line-height:21px;margin:0}
+.cart-actions{justify-content:flex-start;gap:8px;direction:rtl}
+.cart-qty{direction:ltr}
+.cart-qty button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.video-gallery{align-items:start}
+.gallery-card{display:block;align-self:start;margin:0}

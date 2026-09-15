@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/app-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/app-180.png">
-  <link rel="stylesheet" href="/assets/app.css?v=13">
+  <link rel="stylesheet" href="/assets/app.css?v=14">
 </head>
 <body>
   <main class="app">
@@ -113,6 +113,6 @@
     </article>
   </template>
 
-  <script src="/assets/app.js?v=11" defer></script>
+  <script src="/assets/app.js?v=12" defer></script>
 </body>
 </html>
