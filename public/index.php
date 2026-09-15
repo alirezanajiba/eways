@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#05060a">
   <title>ایویز ویدئو</title>
   <meta name="description" content="خرید عمده محصولات از روی ویدئو در ایویز">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ایویز">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/app-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/app-180.png">
   <link rel="stylesheet" href="/assets/app.css?v=11">
 </head>
 <body>
