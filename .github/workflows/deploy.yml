@@ -66,6 +66,7 @@ jobs:
           mkdir -p .deploy/app
           cp -a public/. .deploy/
           cp -a app/. .deploy/app/
+          printf '{"version":"%s"}\n' "$GITHUB_SHA" > .deploy/version.json
 
       - name: Deploy to cPanel
         env:

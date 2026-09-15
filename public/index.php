@@ -1,5 +1,10 @@
+<?php
+$versionFile = __DIR__ . '/version.json';
+$versionData = is_file($versionFile) ? json_decode((string) file_get_contents($versionFile), true) : [];
+$appVersion = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($versionData['version'] ?? 'dev')) ?: 'dev';
+?>
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-app-version="<?= htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8') ?>">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
@@ -12,7 +17,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/app-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/app-180.png">
-  <link rel="stylesheet" href="/assets/app.css?v=14">
+  <link rel="stylesheet" href="/assets/app.css?v=<?= rawurlencode($appVersion) ?>">
 </head>
 <body>
   <main class="app">
@@ -82,6 +87,10 @@
       </form>
     </aside>
 
+    <div class="update-notice" id="update-notice" role="status" aria-live="polite">
+      <div><b>نسخه جدید آماده است</b><span>برای دریافت آخرین تغییرات، اپ را به‌روزرسانی کنید.</span></div>
+      <button type="button" id="apply-update">به‌روزرسانی</button>
+    </div>
     <div class="toast" id="toast"></div>
   </main>
 
@@ -113,6 +122,6 @@
     </article>
   </template>
 
-  <script src="/assets/app.js?v=12" defer></script>
+  <script src="/assets/app.js?v=<?= rawurlencode($appVersion) ?>" defer></script>
 </body>
 </html>

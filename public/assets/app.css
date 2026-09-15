@@ -108,3 +108,12 @@ button{cursor:pointer}
 .cart-qty button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .video-gallery{align-items:start}
 .gallery-card{display:block;align-self:start;margin:0}
+
+/* Precisely center quantity controls, including the SVG minus glyph. */
+.cart-qty button{display:grid;place-items:center;line-height:0;padding:0}
+.cart-qty button svg{display:block;margin:0}
+
+/* In-app deployment update prompt. */
+.update-notice{position:absolute;z-index:80;right:14px;left:14px;bottom:calc(82px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px 11px 11px;border:1px solid rgba(255,255,255,.9);border-radius:18px;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);box-shadow:0 12px 34px rgba(20,23,40,.22);color:#202536;opacity:0;visibility:hidden;transform:translateY(14px);transition:opacity .22s,transform .22s,visibility .22s}
+.update-notice.show{opacity:1;visibility:visible;transform:translateY(0)}
+.update-notice>div{display:grid;gap:2px}.update-notice b{font-size:14px}.update-notice span{font-size:11px;color:#747a8d}.update-notice button{flex:none;border:0;border-radius:12px;padding:10px 13px;background:#6756ed;color:#fff;font-family:inherit;font-size:12px;font-weight:800}.update-notice button:disabled{opacity:.7}
