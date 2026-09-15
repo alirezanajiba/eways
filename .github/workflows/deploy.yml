@@ -60,6 +60,25 @@ jobs:
       - name: Install FTP client
         run: sudo apt-get update && sudo apt-get install -y lftp
 
+      - name: Download legacy media for migration
+        run: |
+          mkdir -p public/media/videos public/media/posters
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://eways.kharjeto.ir/api.php?action=catalog" \
+            --output /tmp/eways-legacy-catalog.json
+          jq -r '.videos[] | .video_path, .poster_path // empty' /tmp/eways-legacy-catalog.json | while IFS= read -r path; do
+            case "$path" in
+              /media/videos/*|/media/posters/*)
+                destination="public${path}"
+                mkdir -p "$(dirname "$destination")"
+                curl --fail --silent --show-error --location --retry 3 \
+                  --connect-timeout 20 --max-time 600 \
+                  "https://eways.kharjeto.ir${path}" \
+                  --output "$destination"
+                ;;
+            esac
+          done
+
       - name: Deploy to cPanel
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -77,6 +96,8 @@ jobs:
             mirror --reverse --verbose --only-newer --exclude-glob .git/ --exclude-glob .github/ --exclude-glob public/media/videos/*.mp4 --exclude-glob public/media/posters/*.jpg --exclude-glob public/media/posters/*.jpeg --exclude-glob public/media/posters/*.png --exclude-glob public/media/posters/*.webp ./ ./;
             mkdir -p public/media/videos;
             mkdir -p public/media/posters;
+            mirror --reverse --verbose --only-newer public/media/videos/ public/media/videos/;
+            mirror --reverse --verbose --only-newer public/media/posters/ public/media/posters/;
             chmod 755 public/media public/media/videos public/media/posters;
             bye;
           "
