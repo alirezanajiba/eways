@@ -227,9 +227,20 @@ function requireAdmin(): void
     }
 }
 
+function publicRootPath(): string
+{
+    // Production is deployed with the contents of /public directly in the
+    // document root, while the repository keeps them in /public.
+    $flatRoot = dirname(__DIR__);
+    if (is_file($flatRoot . '/api.php')) {
+        return realpath($flatRoot) ?: $flatRoot;
+    }
+    return realpath(__DIR__ . '/../public') ?: (__DIR__ . '/../public');
+}
+
 function publicUrl(string $absolutePath): string
 {
-    $publicRoot = realpath(__DIR__ . '/../public') ?: (__DIR__ . '/../public');
+    $publicRoot = publicRootPath();
     $relative = str_replace('\\', '/', substr($absolutePath, strlen($publicRoot)));
     return '/' . ltrim($relative, '/');
 }
@@ -239,8 +250,9 @@ function deleteMediaFile(?string $url): void
     if (!$url || !str_starts_with($url, '/media/')) {
         return;
     }
-    $path = realpath(__DIR__ . '/../public' . $url);
-    $mediaRoot = realpath(__DIR__ . '/../public/media');
+    $publicRoot = publicRootPath();
+    $path = realpath($publicRoot . $url);
+    $mediaRoot = realpath($publicRoot . '/media');
     if ($path && $mediaRoot && str_starts_with($path, $mediaRoot . DIRECTORY_SEPARATOR) && is_file($path)) {
         unlink($path);
     }
@@ -269,7 +281,7 @@ function saveUpload(array $file, string $type): string
     }
 
     $folder = $isVideo ? 'videos' : 'posters';
-    $targetDir = __DIR__ . '/../public/media/' . $folder;
+    $targetDir = publicRootPath() . '/media/' . $folder;
     if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
         throw new RuntimeException('پوشه فایل قابل ایجاد نیست.');
     }
@@ -282,3 +294,36 @@ function saveUpload(array $file, string $type): string
     chmod($target, 0644);
     return publicUrl(realpath($target) ?: $target);
 }
+
+function migrateLegacyMediaLayout(): void
+{
+    $publicRoot = publicRootPath();
+    $legacyMedia = $publicRoot . '/public/media';
+    if (!is_dir($legacyMedia)) {
+        return;
+    }
+
+    foreach (['videos', 'posters'] as $folder) {
+        $sourceDir = $legacyMedia . '/' . $folder;
+        if (!is_dir($sourceDir)) {
+            continue;
+        }
+        $targetDir = $publicRoot . '/media/' . $folder;
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+        foreach (glob($sourceDir . '/*') ?: [] as $source) {
+            if (!is_file($source)) {
+                continue;
+            }
+            $target = $targetDir . '/' . basename($source);
+            if (is_file($target)) {
+                unlink($source);
+            } elseif (!rename($source, $target)) {
+                error_log('Unable to migrate media file: ' . $source);
+            }
+        }
+    }
+}
+
+migrateLegacyMediaLayout();
