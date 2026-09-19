@@ -260,17 +260,32 @@ function normalizeEwaysPayload(mixed $value): mixed
     return $normalized;
 }
 
-function ewaysRequest(string $method, string $path, ?array $payload = null, ?string $userToken = null): array
+function ewaysRequest(
+    string $method,
+    string $path,
+    ?array $payload = null,
+    ?string $userToken = null,
+    bool $withAuthorization = true,
+    array $extraHeaders = []
+): array
 {
     $base = rtrim((string) config('eways_api_base', 'https://company.eways.co'), '/');
     $version = rawurlencode((string) config('eways_api_version', '1'));
     $url = $base . str_replace('{version}', $version, $path);
     $token = preg_replace('/^Bearer\s+/i', '', trim($userToken ?: ewaysApiToken())) ?? '';
-    if ($token === '') {
+    if ($withAuthorization && $token === '') {
         throw new RuntimeException('توکن وب سرویس ایویز روی سرور تنظیم نشده است.');
     }
 
-    $headers = ['Accept: application/json', 'Authorization: Bearer ' . $token];
+    $headers = ['Accept: application/json'];
+    if ($withAuthorization) {
+        $headers[] = 'Authorization: Bearer ' . $token;
+    }
+    foreach ($extraHeaders as $header) {
+        if (is_string($header) && trim($header) !== '') {
+            $headers[] = $header;
+        }
+    }
     $body = null;
     if ($payload !== null) {
         $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

@@ -181,14 +181,18 @@ try {
         }
         // The current official Eways Android app uses this seven-field login
         // contract. The public Swagger still documents the older five fields.
+        $loginAppKey = (string) config('eways_app_key', 'JXZYtqDmdPqpHkYL');
         $response = ewaysRequest('POST', '/api/service/v{version}/user/login', [
-            'AppKey' => (string) config('eways_app_key', 'JXZYtqDmdPqpHkYL'),
+            'AppKey' => $loginAppKey,
             'Info' => ' deviceName : Eways Video Web',
             'Password' => $password,
             'RememberMe' => true,
             'Type' => 8,
             'UserName' => $username,
             'TraceCode' => '9A4DFE50-ADD4-4F26-8F90-FEA6691CF415',
+        ], null, false, [
+            'appKey: ' . $loginAppKey,
+            'lang: FA',
         ]);
         $token = trim((string) ($response['token'] ?? ($response['data']['token'] ?? '')));
         $user = $response['userInfo'] ?? ($response['data']['userInfo'] ?? null);
