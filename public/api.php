@@ -67,6 +67,30 @@ function replaceEwaysBasket(array $items, string $token): void
 }
 
 try {
+    if ($action === 'integration-health' && $method === 'GET') {
+        $token = ewaysApiToken();
+        try {
+            $store = ewaysRequest('GET', '/api/service/v{version}/store/GetBrands');
+            $brands = $store['brands'] ?? $store['items'] ?? [];
+            jsonResponse([
+                'ok' => true,
+                'token_configured' => $token !== '',
+                'token_format' => substr_count($token, '.') === 2 ? 'jwt' : 'opaque',
+                'store_status' => $store['status'] ?? null,
+                'store_description' => $store['description'] ?? null,
+                'store_keys' => array_keys($store),
+                'brands_count' => is_array($brands) ? count($brands) : null,
+            ]);
+        } catch (Throwable $healthError) {
+            jsonResponse([
+                'ok' => false,
+                'token_configured' => $token !== '',
+                'token_format' => substr_count($token, '.') === 2 ? 'jwt' : 'opaque',
+                'message' => $healthError->getMessage(),
+            ], 503);
+        }
+    }
+
     if ($action === 'catalog' && $method === 'GET') {
         $videos = db()->query(
             "SELECT v.*, cat.name AS category_name,

@@ -289,7 +289,20 @@ function ewaysRequest(string $method, string $path, ?array $payload = null, ?str
         throw new RuntimeException('پاسخ وب سرویس ایویز قابل پردازش نیست.');
     }
     if ($statusCode < 200 || $statusCode >= 300) {
-        throw new RuntimeException(trim((string) ($decoded['description'] ?? 'خطا در وب سرویس ایویز.')));
+        $message = trim((string) ($decoded['description'] ?? $decoded['detail'] ?? $decoded['message'] ?? $decoded['title'] ?? ''));
+        if ($message === '' && !empty($decoded['errors']) && is_array($decoded['errors'])) {
+            $parts = [];
+            array_walk_recursive($decoded['errors'], static function (mixed $value) use (&$parts): void {
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    $parts[] = trim((string) $value);
+                }
+            });
+            $message = implode('، ', array_unique($parts));
+        }
+        if ($message === '') {
+            $message = 'خطا در وب سرویس ایویز';
+        }
+        throw new RuntimeException($message . ' (HTTP ' . $statusCode . ')');
     }
     return $decoded;
 }
