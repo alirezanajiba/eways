@@ -270,6 +270,8 @@ function ewaysRequest(string $method, string $path, ?array $payload = null, ?str
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_TIMEOUT => 25,
         CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+        CURLOPT_USERAGENT => 'EwaysVideo/1.0 (+https://eways.radiba.ir)',
     ]);
     if ($body !== null) {
         curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
@@ -277,9 +279,10 @@ function ewaysRequest(string $method, string $path, ?array $payload = null, ?str
     $raw = curl_exec($curl);
     $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
     $curlError = curl_error($curl);
+    $curlErrorCode = curl_errno($curl);
     curl_close($curl);
     if ($raw === false || $curlError !== '') {
-        throw new RuntimeException('ارتباط با وب سرویس ایویز برقرار نشد.');
+        throw new RuntimeException('ارتباط با وب سرویس ایویز برقرار نشد (کد شبکه ' . $curlErrorCode . ').');
     }
     $decoded = json_decode((string) $raw, true);
     if (!is_array($decoded)) {
