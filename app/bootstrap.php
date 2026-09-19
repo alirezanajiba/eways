@@ -245,6 +245,21 @@ function ewaysApiToken(): string
     return preg_replace('/^Bearer\s+/i', '', trim((string) config('api_token', ''))) ?? '';
 }
 
+function normalizeEwaysPayload(mixed $value): mixed
+{
+    if (!is_array($value)) {
+        return $value;
+    }
+    if (array_is_list($value)) {
+        return array_map('normalizeEwaysPayload', $value);
+    }
+    $normalized = [];
+    foreach ($value as $key => $item) {
+        $normalized[is_string($key) ? lcfirst($key) : $key] = normalizeEwaysPayload($item);
+    }
+    return $normalized;
+}
+
 function ewaysRequest(string $method, string $path, ?array $payload = null, ?string $userToken = null): array
 {
     $base = rtrim((string) config('eways_api_base', 'https://company.eways.co'), '/');
@@ -288,6 +303,7 @@ function ewaysRequest(string $method, string $path, ?array $payload = null, ?str
     if (!is_array($decoded)) {
         throw new RuntimeException('پاسخ وب سرویس ایویز قابل پردازش نیست.');
     }
+    $decoded = normalizeEwaysPayload($decoded);
     if ($statusCode < 200 || $statusCode >= 300) {
         $message = trim((string) ($decoded['description'] ?? $decoded['detail'] ?? $decoded['message'] ?? $decoded['title'] ?? ''));
         if ($message === '' && !empty($decoded['errors']) && is_array($decoded['errors'])) {
@@ -304,6 +320,11 @@ function ewaysRequest(string $method, string $path, ?array $payload = null, ?str
         }
         throw new RuntimeException($message . ' (HTTP ' . $statusCode . ')');
     }
+    // The live API wraps many responses in Data although Swagger exposes
+    // those fields at the response root. Support both shapes.
+    if (isset($decoded['data']) && is_array($decoded['data']) && !array_is_list($decoded['data'])) {
+        $decoded = array_replace($decoded['data'], $decoded);
+    }
     return $decoded;
 }
 
@@ -316,7 +337,7 @@ function ewaysDescription(array $response, string $fallback): string
 function ewaysProduct(int $productId, ?string $token = null): array
 {
     $response = ewaysRequest('GET', '/api/service/v{version}/store/GetProduct/' . $productId, null, $token);
-    $product = $response['product'] ?? null;
+    $product = $response['product'] ?? $response['data'] ?? (!empty($response['id']) ? $response : null);
     if (!is_array($product) || empty($product['id'])) {
         throw new RuntimeException(ewaysDescription($response, 'کالایی با این کد در ایویز پیدا نشد.'));
     }
@@ -334,7 +355,7 @@ function currentEwaysUser(bool $refresh = false): ?array
     }
     try {
         $response = ewaysRequest('GET', '/api/service/v{version}/user/GetProfile', null, $token);
-        $user = $response['userInfo'] ?? null;
+        $user = $response['userInfo'] ?? $response['data'] ?? (!empty($response['userId']) ? $response : null);
         if (!is_array($user) || empty($user['userId'])) {
             throw new RuntimeException(ewaysDescription($response, 'نشست کاربری ایویز معتبر نیست.'));
         }

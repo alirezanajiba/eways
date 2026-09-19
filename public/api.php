@@ -71,21 +71,16 @@ try {
         $token = ewaysApiToken();
         try {
             $store = ewaysRequest('GET', '/api/service/v{version}/store/GetBrands');
-            $brands = $store['brands'] ?? $store['items'] ?? [];
+            $brands = $store['brands'] ?? $store['items'] ?? $store['data'] ?? [];
             jsonResponse([
                 'ok' => true,
-                'token_configured' => $token !== '',
-                'token_format' => substr_count($token, '.') === 2 ? 'jwt' : 'opaque',
                 'store_status' => $store['status'] ?? null,
                 'store_description' => $store['description'] ?? null,
-                'store_keys' => array_keys($store),
                 'brands_count' => is_array($brands) ? count($brands) : null,
             ]);
         } catch (Throwable $healthError) {
             jsonResponse([
                 'ok' => false,
-                'token_configured' => $token !== '',
-                'token_format' => substr_count($token, '.') === 2 ? 'jwt' : 'opaque',
                 'message' => $healthError->getMessage(),
             ], 503);
         }
@@ -193,8 +188,11 @@ try {
             'appKey' => ewaysApiToken(),
             'rememberMe' => true,
         ]);
-        $token = trim((string) ($response['token'] ?? ''));
-        $user = $response['userInfo'] ?? null;
+        $token = trim((string) ($response['token'] ?? ($response['data']['token'] ?? '')));
+        $user = $response['userInfo'] ?? ($response['data']['userInfo'] ?? null);
+        if (!is_array($user) && !empty($response['userId'])) {
+            $user = $response;
+        }
         if ($token === '' || !is_array($user) || empty($user['userId'])) {
             error_log('Eways login rejected. Status: ' . (string) ($response['status'] ?? 'unknown') . '; Description: ' . (string) ($response['description'] ?? ''));
             $message = ewaysDescription($response, 'نام کاربری یا رمز عبور ایویز صحیح نیست.');
