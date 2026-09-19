@@ -1,0 +1,60 @@
+name: Rewrite CI
+
+on:
+  push:
+    branches:
+      - rewrite/react-laravel-foundation
+    paths:
+      - 'next/**'
+      - '.github/workflows/rewrite-ci.yml'
+  pull_request:
+    paths:
+      - 'next/**'
+      - '.github/workflows/rewrite-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: next/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, curl, fileinfo
+          coverage: none
+      - run: mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache bootstrap/cache
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+      - run: php artisan route:list
+      - run: find app routes config bootstrap -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  frontend-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: next/frontend-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build
+
+  frontend-admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: next/frontend-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build

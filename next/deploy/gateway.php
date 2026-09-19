@@ -1,0 +1,12 @@
+<?php
+
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+require __DIR__.'/.backend/vendor/autoload.php';
+
+/** @var \Illuminate\Foundation\Application $app */
+$app = require __DIR__.'/.backend/bootstrap/app.php';
+$app->usePublicPath(__DIR__);
+$app->handleRequest(Request::capture());

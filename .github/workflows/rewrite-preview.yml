@@ -1,0 +1,153 @@
+name: Rewrite Preview Deploy
+
+on:
+  push:
+    branches:
+      - rewrite/react-laravel-foundation
+    paths:
+      - 'next/**'
+      - '.github/workflows/rewrite-preview.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: eways-rewrite-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      PREVIEW_DIR: ${{ secrets.REWRITE_FTP_SERVER_DIR }}
+      DB_HOST: ${{ secrets.REWRITE_DB_HOST }}
+      DB_NAME: ${{ secrets.REWRITE_DB_NAME }}
+      DB_USER: ${{ secrets.REWRITE_DB_USER }}
+      DB_PASSWORD: ${{ secrets.REWRITE_DB_PASSWORD }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      APP_KEY: ${{ secrets.REWRITE_APP_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate isolated preview secrets
+        id: secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in FTP_HOST FTP_USERNAME FTP_PASSWORD PREVIEW_DIR DB_NAME DB_USER DB_PASSWORD ADMIN_PASSWORD API_TOKEN APP_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::warning::Preview secret $name is missing"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, curl, fileinfo
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Build Laravel backend
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: next/backend
+        run: |
+          mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache bootstrap/cache
+          composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+          cat > .env <<EOF
+          APP_NAME="EWAYS Video Preview"
+          APP_ENV=staging
+          APP_KEY=$APP_KEY
+          APP_DEBUG=false
+          APP_URL=https://preview.eways.radiba.ir
+          LOG_CHANNEL=errorlog
+          DB_CONNECTION=mysql
+          DB_HOST=${DB_HOST:-localhost}
+          DB_PORT=3306
+          DB_DATABASE=$DB_NAME
+          DB_USERNAME=$DB_USER
+          DB_PASSWORD=$DB_PASSWORD
+          SESSION_DRIVER=file
+          SESSION_LIFETIME=120
+          SESSION_SECURE_COOKIE=true
+          ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+          ADMIN_PASSWORD=$ADMIN_PASSWORD
+          EWAYS_API_TOKEN=$API_TOKEN
+          EWAYS_API_BASE=https://company.eways.co
+          EWAYS_API_VERSION=1
+          EWAYS_DEPOSIT_URL=https://panel.eways.co
+          EOF
+          php artisan config:clear
+          php artisan route:list
+
+      - name: Build React app
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: next/frontend-app
+        env:
+          VITE_API_BASE: /api/v1
+        run: |
+          npm install
+          npm run build
+
+      - name: Build React admin
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: next/frontend-admin
+        env:
+          VITE_API_BASE: /api/v1
+        run: |
+          npm install
+          npm run build
+
+      - name: Assemble preview package
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          rm -rf .preview
+          mkdir -p .preview/.backend .preview/admin .preview/media/videos .preview/media/posters
+          cp -a next/frontend-app/dist/. .preview/
+          cp -a next/frontend-admin/dist/index.html .preview/admin/index.html
+          if [ -d next/frontend-admin/dist/assets ]; then cp -a next/frontend-admin/dist/assets/. .preview/assets/; fi
+          rsync -a --exclude public --exclude tests next/backend/ .preview/.backend/
+          cp next/deploy/gateway.php .preview/gateway.php
+          cp next/deploy/.htaccess .preview/.htaccess
+          printf '{"version":"%s"}\n' "$GITHUB_SHA" > .preview/version.json
+
+      - name: Install FTP client
+        if: steps.secrets.outputs.ready == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Deploy isolated preview
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          lftp -c "
+            set ftp:ssl-force false;
+            set ftp:ssl-protect-data false;
+            set ssl:verify-certificate false;
+            set net:max-retries 2;
+            open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_HOST\";
+            cd \"$PREVIEW_DIR\";
+            mirror --reverse --delete --verbose --exclude-glob media/videos/* --exclude-glob media/posters/* .preview/ ./;
+            mkdir -p media/videos;
+            mkdir -p media/posters;
+            chmod 755 media media/videos media/posters .backend .backend/storage .backend/bootstrap/cache;
+            bye;
+          "
+
+      - name: Preview not deployed
+        if: steps.secrets.outputs.ready != 'true'
+        run: echo "Preview build/deploy skipped because isolated staging secrets are not configured yet."

@@ -1,0 +1,25 @@
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Never expose the Laravel application tree directly.
+  RewriteRule ^\.backend(?:/.*)?$ - [F,L]
+
+  # Laravel API only. Static React assets/pages stay directly served by Apache.
+  RewriteRule ^api/v1(?:/.*)?$ gateway.php [QSA,L]
+  RewriteRule ^up$ gateway.php [QSA,L]
+
+  # Keep uploaded media and built assets public.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # React app fallback, excluding admin which has its own index.html.
+  RewriteRule ^admin(?:/.*)?$ admin/index.html [L]
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<FilesMatch "^(\.env|composer\.(json|lock))$">
+  Require all denied
+</FilesMatch>
