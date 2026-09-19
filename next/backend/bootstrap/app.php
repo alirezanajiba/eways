@@ -12,10 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // React clients are served from the same trusted origin. Eways auth stays
-        // server-side in an encrypted HttpOnly session cookie.
+        // React clients are served from the same trusted origin. Sensitive Eways
+        // credentials/tokens never leave the encrypted HttpOnly Laravel session.
         $middleware->validateCsrfTokens(except: [
             'api/v1/eways/*',
+            'api/v1/orders',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
