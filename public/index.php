@@ -24,7 +24,7 @@ $appVersion = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($versionData['vers
     <section class="feed-page active" id="feed-page">
       <div class="video-feed" id="video-feed" aria-live="polite"></div>
       <header class="topbar">
-        <div class="wallet"><span class="coin">ت</span><span>سپرده<br><b>۱۸,۴۵۰,۰۰۰ تومان</b></span></div>
+        <button class="wallet" id="wallet-button" type="button"><span class="coin">ت</span><span>سپرده<br><b id="wallet-amount">ورود به ایویز</b></span></button>
       </header>
       <div class="feed-state" id="feed-state"><span class="loader"></span><p>در حال دریافت ویدئوها...</p></div>
     </section>
@@ -85,6 +85,27 @@ $appVersion = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($versionData['vers
         <textarea name="body" placeholder="نظر یا سوال خود را بنویسید" maxlength="1000" required></textarea>
         <button type="submit">ثبت دیدگاه</button>
       </form>
+    </aside>
+
+    <aside class="sheet account-sheet" id="account-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head"><h2>حساب ایویز</h2><button class="close-sheet">×</button></div>
+      <section class="eways-login-view" id="eways-login-view">
+        <div class="account-intro"><span class="account-logo">E</span><div><b>ورود به حساب ایویز</b><p>برای مشاهده سپرده و خرید محصولات متصل وارد شوید.</p></div></div>
+        <form class="eways-login-form" id="eways-login-form">
+          <label>نام کاربری ایویز<input name="username" autocomplete="username" required></label>
+          <label>رمز عبور ایویز<input name="password" type="password" autocomplete="current-password" required></label>
+          <button type="submit">ورود به ایویز</button>
+          <p class="account-message" id="account-message"></p>
+        </form>
+      </section>
+      <section class="eways-profile-view hidden" id="eways-profile-view">
+        <div class="profile-name"><span class="profile-avatar" id="profile-avatar">ا</span><div><b id="profile-name">کاربر ایویز</b><small id="profile-username"></small></div></div>
+        <div class="deposit-card"><span>سپرده قابل استفاده</span><strong id="profile-deposit">۰ تومان</strong></div>
+        <div class="deposit-alert hidden" id="deposit-alert"></div>
+        <a class="increase-deposit" id="increase-deposit" href="#" target="_blank" rel="noopener">افزایش سپرده در ایویز</a>
+        <button class="eways-logout" id="eways-logout" type="button">خروج از حساب ایویز</button>
+      </section>
     </aside>
 
     <div class="update-notice" id="update-notice" role="status" aria-live="polite">

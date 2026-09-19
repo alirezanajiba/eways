@@ -46,6 +46,26 @@ function serverTierPrice(PDO $pdo, int $videoId, int $quantity, int $basePrice):
     return $tierPrice === false ? $basePrice : (int) $tierPrice;
 }
 
+function replaceEwaysBasket(array $items, string $token): void
+{
+    ewaysRequest('GET', '/api/service/v{version}/store/RemoveBasketItems', null, $token);
+    foreach ($items as $item) {
+        $productId = (int) ($item['productId'] ?? 0);
+        $count = (int) ($item['count'] ?? 0);
+        if ($productId < 1 || $count < 1) {
+            continue;
+        }
+        $response = ewaysRequest('POST', '/api/service/v{version}/store/AddToBasket', [
+            'productId' => $productId,
+            'count' => $count,
+            'categoryId' => null,
+        ], $token);
+        if (!array_key_exists('items', $response)) {
+            throw new RuntimeException(ewaysDescription($response, 'ساخت سبد خرید ایویز انجام نشد.'));
+        }
+    }
+}
+
 try {
     if ($action === 'catalog' && $method === 'GET') {
         $videos = db()->query(
@@ -130,6 +150,41 @@ try {
         jsonResponse(['ok' => true]);
     }
 
+    if ($action === 'eways-login' && $method === 'POST') {
+        $data = requestData();
+        $username = trim((string) ($data['username'] ?? ''));
+        $password = (string) ($data['password'] ?? '');
+        if ($username === '' || $password === '') {
+            jsonResponse(['ok' => false, 'message' => 'نام کاربری و رمز عبور ایویز را وارد کنید.'], 422);
+        }
+        $response = ewaysRequest('POST', '/api/service/v{version}/user/login', [
+            'userName' => $username,
+            'password' => $password,
+            'info' => 'eways-video-' . substr(hash('sha256', session_id()), 0, 24),
+            'appKey' => ewaysApiToken(),
+            'rememberMe' => true,
+        ]);
+        $token = trim((string) ($response['token'] ?? ''));
+        $user = $response['userInfo'] ?? null;
+        if ($token === '' || !is_array($user) || empty($user['userId'])) {
+            jsonResponse(['ok' => false, 'message' => ewaysDescription($response, 'نام کاربری یا رمز عبور ایویز صحیح نیست.')], 401);
+        }
+        session_regenerate_id(true);
+        $_SESSION['eways_user_token'] = $token;
+        $_SESSION['eways_user_info'] = $user;
+        jsonResponse(['ok' => true, 'user' => $user, 'deposit_url' => config('eways_deposit_url')]);
+    }
+
+    if ($action === 'eways-user' && $method === 'GET') {
+        $user = currentEwaysUser(true);
+        jsonResponse(['ok' => true, 'authenticated' => $user !== null, 'user' => $user, 'deposit_url' => config('eways_deposit_url')]);
+    }
+
+    if ($action === 'eways-logout' && $method === 'POST') {
+        unset($_SESSION['eways_user_token'], $_SESSION['eways_user_info']);
+        jsonResponse(['ok' => true]);
+    }
+
     if ($action === 'order' && $method === 'POST') {
         $data = requestData();
         $rawItems = is_array($data['items'] ?? null) ? $data['items'] : [];
@@ -146,8 +201,7 @@ try {
         }
 
         $pdo = db();
-        $pdo->beginTransaction();
-        $productStmt = $pdo->prepare("SELECT id, title, price, stock_remaining, is_active, timer_end FROM videos WHERE id = ? FOR UPDATE");
+        $productStmt = $pdo->prepare("SELECT id, title, price, stock_remaining, is_active, timer_end, source_type, eways_product_id FROM videos WHERE id = ?");
         $products = [];
         $shortages = [];
         foreach ($requested as $videoId => $quantity) {
@@ -164,18 +218,140 @@ try {
                 ];
                 continue;
             }
-            $unitPrice = serverTierPrice($pdo, $videoId, $quantity, (int) $product['price']);
+            $unitPrice = $product['source_type'] === 'eways'
+                ? (int) $product['price']
+                : serverTierPrice($pdo, $videoId, $quantity, (int) $product['price']);
             $product['quantity'] = $quantity;
             $product['unit_price'] = $unitPrice;
             $product['line_total'] = $unitPrice * $quantity;
             $products[] = $product;
         }
         if ($shortages) {
-            $pdo->rollBack();
             jsonResponse(['ok' => false, 'message' => 'موجودی بعضی محصولات برای ثبت سفارش کافی نیست.', 'shortages' => $shortages], 409);
         }
 
+        $sourceTypes = array_values(array_unique(array_column($products, 'source_type')));
+        if (count($sourceTypes) > 1) {
+            jsonResponse(['ok' => false, 'message' => 'کالاهای متصل به ایویز و کالاهای مستقل را در دو سفارش جداگانه ثبت کنید.'], 422);
+        }
+
+        if (($sourceTypes[0] ?? 'manual') === 'eways') {
+            $user = currentEwaysUser(true);
+            if (!$user) {
+                jsonResponse(['ok' => false, 'message' => 'برای خرید با سپرده، ابتدا وارد حساب ایویز شوید.', 'login_required' => true], 401);
+            }
+            $userToken = (string) $_SESSION['eways_user_token'];
+            $deposit = (int) round((float) ($user['revenue'] ?? 0));
+            $remoteProducts = [];
+            $shortages = [];
+            foreach ($products as &$product) {
+                $remote = ewaysProduct((int) $product['eways_product_id'], $userToken);
+                $available = !empty($remote['availability']) ? (int) ($remote['stock'] ?? 0) : 0;
+                $maxOrder = (int) ($remote['maxOrder'] ?? 0);
+                if ($maxOrder > 0) {
+                    $available = min($available, $maxOrder);
+                }
+                if ((int) $product['quantity'] > $available) {
+                    $shortages[] = ['video_id' => (int) $product['id'], 'title' => $product['title'], 'available' => $available, 'requested' => (int) $product['quantity']];
+                    continue;
+                }
+                $product['unit_price'] = (int) round((float) ($remote['price'] ?? 0));
+                $product['line_total'] = $product['unit_price'] * (int) $product['quantity'];
+                $remoteProducts[(int) $product['eways_product_id']] = $remote;
+            }
+            unset($product);
+            if ($shortages) {
+                jsonResponse(['ok' => false, 'message' => 'موجودی بعضی محصولات در ایویز کافی نیست.', 'shortages' => $shortages], 409);
+            }
+
+            $basketRequest = [
+                'type' => 0,
+                'couponCode' => null,
+                'state' => $user['stateId'] ?? null,
+                'city' => $user['townId'] ?? null,
+            ];
+            $originalBasket = ewaysRequest('POST', '/api/service/v{version}/store/GetBasketDetails', $basketRequest, $userToken);
+            $originalItems = [];
+            foreach (($originalBasket['basket'] ?? []) as $item) {
+                if (is_array($item) && !empty($item['productId']) && !empty($item['count'])) {
+                    $originalItems[] = ['productId' => (int) $item['productId'], 'count' => (int) $item['count']];
+                }
+            }
+            $appBasketItems = array_map(static fn(array $product): array => [
+                'productId' => (int) $product['eways_product_id'],
+                'count' => (int) $product['quantity'],
+            ], $products);
+            try {
+                replaceEwaysBasket($appBasketItems, $userToken);
+                $basket = ewaysRequest('POST', '/api/service/v{version}/store/GetBasketDetails', $basketRequest, $userToken);
+            } catch (Throwable $e) {
+                try { replaceEwaysBasket($originalItems, $userToken); } catch (Throwable) {}
+                throw $e;
+            }
+            $total = (int) round((float) ($basket['payingPrice'] ?? array_sum(array_column($products, 'line_total'))));
+            if ($deposit < $total) {
+                try { replaceEwaysBasket($originalItems, $userToken); } catch (Throwable) {}
+                jsonResponse([
+                    'ok' => false,
+                    'message' => 'سپرده ایویز برای ثبت این سفارش کافی نیست.',
+                    'insufficient_deposit' => true,
+                    'deposit' => $deposit,
+                    'required' => $total,
+                    'deposit_url' => config('eways_deposit_url'),
+                ], 402);
+            }
+            $shippingType = (int) ($basket['shippingType'] ?? 0);
+            try {
+                $buy = ewaysRequest('POST', '/api/service/v{version}/store/Buy', [
+                    'type' => $shippingType,
+                    'deliveryAddress' => $user['address'] ?? '',
+                    'description' => 'سفارش ثبت شده از ایویز ویدئو',
+                    'couponCode' => null,
+                    'gateway' => 0,
+                    'gatewayType' => 0,
+                    'stateId' => $user['stateId'] ?? null,
+                    'cityId' => $user['townId'] ?? null,
+                    'zipCode' => $user['postCode'] ?? null,
+                    'periodTimeId' => null,
+                    'recipientName' => $user['fullName'] ?? trim(($user['firstName'] ?? '') . ' ' . ($user['lastName'] ?? '')),
+                    'recipientCellPhone' => $user['mobile'] ?? null,
+                    'callbackUrl' => null,
+                ], $userToken);
+            } catch (Throwable $e) {
+                try { replaceEwaysBasket($originalItems, $userToken); } catch (Throwable) {}
+                throw $e;
+            }
+            $ewaysOrderId = (int) ($buy['orderId'] ?? 0);
+            if ($ewaysOrderId < 1) {
+                try { replaceEwaysBasket($originalItems, $userToken); } catch (Throwable) {}
+                jsonResponse(['ok' => false, 'message' => ewaysDescription($buy, 'ثبت سفارش در ایویز انجام نشد.')], 422);
+            }
+
+            try {
+                replaceEwaysBasket($originalItems, $userToken);
+            } catch (Throwable $restoreError) {
+                error_log('Eways basket restore failed after order ' . $ewaysOrderId . ': ' . $restoreError->getMessage());
+            }
+
+            $pdo->beginTransaction();
+            $orderStmt = $pdo->prepare("INSERT INTO orders (total_amount, order_source, eways_user_id, eways_order_id, eways_request_id) VALUES (?, 'eways', ?, ?, ?)");
+            $orderStmt->execute([$total, (int) $user['userId'], $ewaysOrderId, (string) ($buy['reqId'] ?? '')]);
+            $orderId = (int) $pdo->lastInsertId();
+            $itemStmt = $pdo->prepare("INSERT INTO order_items (order_id, video_id, quantity, unit_price, line_total) VALUES (?, ?, ?, ?, ?)");
+            $syncStmt = $pdo->prepare("UPDATE videos SET price=?, stock_remaining=?, stock_total=GREATEST(stock_total, ?) WHERE id=?");
+            foreach ($products as $product) {
+                $itemStmt->execute([$orderId, $product['id'], $product['quantity'], $product['unit_price'], $product['line_total']]);
+                $remote = $remoteProducts[(int) $product['eways_product_id']];
+                $remaining = max(0, (int) ($remote['stock'] ?? 0) - (int) $product['quantity']);
+                $syncStmt->execute([$product['unit_price'], $remaining, (int) ($remote['stock'] ?? 0), $product['id']]);
+            }
+            $pdo->commit();
+            $_SESSION['eways_user_info']['revenue'] = max(0, $deposit - $total);
+            jsonResponse(['ok' => true, 'order_id' => $orderId, 'eways_order_id' => $ewaysOrderId, 'total_amount' => $total, 'message' => 'سفارش با موفقیت در ایویز ثبت شد.']);
+        }
+
         $total = array_sum(array_column($products, 'line_total'));
+        $pdo->beginTransaction();
         $orderStmt = $pdo->prepare("INSERT INTO orders (total_amount) VALUES (?)");
         $orderStmt->execute([$total]);
         $orderId = (int) $pdo->lastInsertId();
@@ -240,6 +416,16 @@ try {
 
     if ($action === 'admin-status' && $method === 'GET') {
         jsonResponse(['ok' => true, 'authenticated' => !empty($_SESSION['eways_admin'])]);
+    }
+
+    if ($action === 'admin-eways-product' && $method === 'POST') {
+        requireAdmin();
+        $data = requestData();
+        $productId = filter_var($data['product_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$productId) {
+            jsonResponse(['ok' => false, 'message' => 'کد کالای ایویز معتبر نیست.'], 422);
+        }
+        jsonResponse(['ok' => true, 'product' => ewaysProduct((int) $productId)]);
     }
 
     if ($action === 'admin-videos' && $method === 'GET') {
@@ -317,7 +503,24 @@ try {
         requireAdmin();
         $data = requestData();
         $id = filter_var($data['id'] ?? null, FILTER_VALIDATE_INT);
+        $sourceType = ($data['source_type'] ?? 'manual') === 'eways' ? 'eways' : 'manual';
+        $ewaysProductId = $sourceType === 'eways' ? filter_var($data['eways_product_id'] ?? null, FILTER_VALIDATE_INT) : null;
+        $remoteProduct = null;
+        if ($sourceType === 'eways') {
+            if (!$ewaysProductId) {
+                jsonResponse(['ok' => false, 'message' => 'کد کالای ایویز را وارد و استعلام کنید.'], 422);
+            }
+            $remoteProduct = ewaysProduct((int) $ewaysProductId);
+            $duplicate = db()->prepare("SELECT id FROM videos WHERE eways_product_id = ? AND id <> ? LIMIT 1");
+            $duplicate->execute([(int) $ewaysProductId, (int) ($id ?: 0)]);
+            if ($duplicate->fetch()) {
+                jsonResponse(['ok' => false, 'message' => 'این کالای ایویز قبلاً به یک ویدئو متصل شده است.'], 422);
+            }
+        }
         $title = trim((string) ($data['title'] ?? ''));
+        if ($title === '' && $remoteProduct) {
+            $title = trim((string) ($remoteProduct['name'] ?? ''));
+        }
         if ($title === '') {
             jsonResponse(['ok' => false, 'message' => 'عنوان محصول اجباری است.'], 422);
         }
@@ -352,7 +555,7 @@ try {
             jsonResponse(['ok' => false, 'message' => 'انتخاب فایل ویدئو اجباری است.'], 422);
         }
 
-        $tierMins = (array) ($data['tier_min_qty'] ?? []);
+        $tierMins = $sourceType === 'eways' ? [] : (array) ($data['tier_min_qty'] ?? []);
         $tierPrices = (array) ($data['tier_unit_price'] ?? []);
         $priceTiers = [];
         foreach ($tierMins as $index => $minimum) {
@@ -384,16 +587,20 @@ try {
             }
         }
 
+        $remotePrice = $remoteProduct ? max(0, (int) round((float) ($remoteProduct['price'] ?? 0))) : null;
+        $remoteStock = $remoteProduct ? max(0, (int) ($remoteProduct['stock'] ?? 0)) : null;
         $values = [
-            trim((string) ($data['product_code'] ?? '')) ?: null,
+            $sourceType === 'eways' ? (string) $ewaysProductId : (trim((string) ($data['product_code'] ?? '')) ?: null),
+            $sourceType,
+            $ewaysProductId ?: null,
             $categoryId,
             $title,
             trim((string) ($data['description'] ?? '')) ?: null,
-            trim((string) ($data['brand'] ?? '')) ?: null,
+            $remoteProduct ? (trim((string) ($remoteProduct['brandName'] ?? '')) ?: null) : (trim((string) ($data['brand'] ?? '')) ?: null),
             trim((string) ($data['shipping_text'] ?? '')) ?: null,
-            max(0, (int) ($data['price'] ?? 0)),
-            max(0, (int) ($data['stock_remaining'] ?? 0)),
-            max(0, (int) ($data['stock_total'] ?? 0)),
+            $remotePrice ?? max(0, (int) ($data['price'] ?? 0)),
+            $remoteStock ?? max(0, (int) ($data['stock_remaining'] ?? 0)),
+            $remoteStock ?? max(0, (int) ($data['stock_total'] ?? 0)),
             !empty($data['timer_end']) ? date('Y-m-d H:i:s', strtotime((string) $data['timer_end'])) : null,
             $videoPath,
             $posterPath,
@@ -403,15 +610,15 @@ try {
 
         if ($id) {
             $stmt = db()->prepare(
-                "UPDATE videos SET product_code=?, category_id=?, title=?, description=?, brand=?, shipping_text=?, price=?,
+                "UPDATE videos SET product_code=?, source_type=?, eways_product_id=?, category_id=?, title=?, description=?, brand=?, shipping_text=?, price=?,
                  stock_remaining=?, stock_total=?, timer_end=?, video_path=?, poster_path=?, sort_order=?, is_active=? WHERE id=?"
             );
             $values[] = $id;
             $stmt->execute($values);
         } else {
             $stmt = db()->prepare(
-                "INSERT INTO videos (product_code,category_id,title,description,brand,shipping_text,price,stock_remaining,stock_total,timer_end,video_path,poster_path,sort_order,is_active)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "INSERT INTO videos (product_code,source_type,eways_product_id,category_id,title,description,brand,shipping_text,price,stock_remaining,stock_total,timer_end,video_path,poster_path,sort_order,is_active)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             );
             $stmt->execute($values);
             $id = (int) db()->lastInsertId();
@@ -451,6 +658,9 @@ try {
     }
 
     jsonResponse(['ok' => false, 'message' => 'درخواست نامعتبر است.'], 404);
+} catch (RuntimeException $e) {
+    error_log($e->getMessage());
+    jsonResponse(['ok' => false, 'message' => $e->getMessage()], 502);
 } catch (Throwable $e) {
     error_log($e->getMessage());
     jsonResponse(['ok' => false, 'message' => 'خطایی در ارتباط با سرور رخ داد.'], 500);

@@ -53,7 +53,7 @@ function migrate(PDO $pdo): void
     // Avoid running several DDL statements on every public API request.
     try {
         $schemaVersion = (int) $pdo->query("SELECT meta_value FROM app_meta WHERE meta_key = 'schema_version'")->fetchColumn();
-        if ($schemaVersion >= 3) {
+        if ($schemaVersion >= 4) {
             $done = true;
             return;
         }
@@ -107,6 +107,13 @@ function migrate(PDO $pdo): void
     $categoryColumn = $pdo->query("SHOW COLUMNS FROM videos LIKE 'category_id'")->fetch();
     if (!$categoryColumn) {
         $pdo->exec("ALTER TABLE videos ADD COLUMN category_id BIGINT UNSIGNED DEFAULT NULL AFTER product_code, ADD INDEX idx_category_id (category_id)");
+    }
+
+    if (!$pdo->query("SHOW COLUMNS FROM videos LIKE 'source_type'")->fetch()) {
+        $pdo->exec("ALTER TABLE videos ADD COLUMN source_type VARCHAR(20) NOT NULL DEFAULT 'manual' AFTER product_code");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM videos LIKE 'eways_product_id'")->fetch()) {
+        $pdo->exec("ALTER TABLE videos ADD COLUMN eways_product_id INT UNSIGNED DEFAULT NULL AFTER source_type, ADD UNIQUE KEY uq_eways_product_id (eways_product_id)");
     }
 
     $pdo->exec(
@@ -176,6 +183,19 @@ function migrate(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 
+    if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'order_source'")->fetch()) {
+        $pdo->exec("ALTER TABLE orders ADD COLUMN order_source VARCHAR(20) NOT NULL DEFAULT 'local' AFTER status");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'eways_user_id'")->fetch()) {
+        $pdo->exec("ALTER TABLE orders ADD COLUMN eways_user_id BIGINT DEFAULT NULL AFTER order_source");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'eways_order_id'")->fetch()) {
+        $pdo->exec("ALTER TABLE orders ADD COLUMN eways_order_id BIGINT DEFAULT NULL AFTER eways_user_id");
+    }
+    if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'eways_request_id'")->fetch()) {
+        $pdo->exec("ALTER TABLE orders ADD COLUMN eways_request_id VARCHAR(80) DEFAULT NULL AFTER eways_order_id");
+    }
+
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS comments (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -196,7 +216,7 @@ function migrate(PDO $pdo): void
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
-    $pdo->exec("INSERT INTO app_meta (meta_key, meta_value) VALUES ('schema_version', '3') ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)");
+    $pdo->exec("INSERT INTO app_meta (meta_key, meta_value) VALUES ('schema_version', '4') ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)");
 
     $done = true;
 }
@@ -218,6 +238,96 @@ function requestData(): array
         return is_array($decoded) ? $decoded : [];
     }
     return $_POST;
+}
+
+function ewaysApiToken(): string
+{
+    return preg_replace('/^Bearer\s+/i', '', trim((string) config('api_token', ''))) ?? '';
+}
+
+function ewaysRequest(string $method, string $path, ?array $payload = null, ?string $userToken = null): array
+{
+    $base = rtrim((string) config('eways_api_base', 'https://company.eways.co'), '/');
+    $version = rawurlencode((string) config('eways_api_version', '1'));
+    $url = $base . str_replace('{version}', $version, $path);
+    $token = preg_replace('/^Bearer\s+/i', '', trim($userToken ?: ewaysApiToken())) ?? '';
+    if ($token === '') {
+        throw new RuntimeException('توکن وب سرویس ایویز روی سرور تنظیم نشده است.');
+    }
+
+    $headers = ['Accept: application/json', 'Authorization: Bearer ' . $token];
+    $body = null;
+    if ($payload !== null) {
+        $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $headers[] = 'Content-Type: application/json';
+    }
+
+    $curl = curl_init($url);
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST => strtoupper($method),
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_FOLLOWLOCATION => true,
+    ]);
+    if ($body !== null) {
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
+    }
+    $raw = curl_exec($curl);
+    $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($curl);
+    curl_close($curl);
+    if ($raw === false || $curlError !== '') {
+        throw new RuntimeException('ارتباط با وب سرویس ایویز برقرار نشد.');
+    }
+    $decoded = json_decode((string) $raw, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('پاسخ وب سرویس ایویز قابل پردازش نیست.');
+    }
+    if ($statusCode < 200 || $statusCode >= 300) {
+        throw new RuntimeException(trim((string) ($decoded['description'] ?? 'خطا در وب سرویس ایویز.')));
+    }
+    return $decoded;
+}
+
+function ewaysDescription(array $response, string $fallback): string
+{
+    $description = trim((string) ($response['description'] ?? ''));
+    return $description !== '' ? $description : $fallback;
+}
+
+function ewaysProduct(int $productId, ?string $token = null): array
+{
+    $response = ewaysRequest('GET', '/api/service/v{version}/store/GetProduct/' . $productId, null, $token);
+    $product = $response['product'] ?? null;
+    if (!is_array($product) || empty($product['id'])) {
+        throw new RuntimeException(ewaysDescription($response, 'کالایی با این کد در ایویز پیدا نشد.'));
+    }
+    return $product;
+}
+
+function currentEwaysUser(bool $refresh = false): ?array
+{
+    $token = (string) ($_SESSION['eways_user_token'] ?? '');
+    if ($token === '') {
+        return null;
+    }
+    if (!$refresh && !empty($_SESSION['eways_user_info']) && is_array($_SESSION['eways_user_info'])) {
+        return $_SESSION['eways_user_info'];
+    }
+    try {
+        $response = ewaysRequest('GET', '/api/service/v{version}/user/GetProfile', null, $token);
+        $user = $response['userInfo'] ?? null;
+        if (!is_array($user) || empty($user['userId'])) {
+            throw new RuntimeException(ewaysDescription($response, 'نشست کاربری ایویز معتبر نیست.'));
+        }
+        $_SESSION['eways_user_info'] = $user;
+        return $user;
+    } catch (Throwable $e) {
+        unset($_SESSION['eways_user_token'], $_SESSION['eways_user_info']);
+        return null;
+    }
 }
 
 function requireAdmin(): void

@@ -27,13 +27,17 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          for name in FTP_HOST FTP_USERNAME FTP_PASSWORD DB_USER DB_PASSWORD ADMIN_PASSWORD; do
+          for name in FTP_HOST FTP_USERNAME FTP_PASSWORD DB_USER DB_PASSWORD ADMIN_PASSWORD API_TOKEN; do
             if [ -z "${!name}" ]; then
               echo "::error::Required secret $name is missing"
               exit 1
             fi
           done
+
+      - name: Validate PHP syntax
+        run: find app public -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Create server configuration
         env:
@@ -43,6 +47,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
           php -r '
             $config = [
@@ -52,6 +57,10 @@ jobs:
               "db_password" => getenv("DB_PASSWORD"),
               "admin_username" => getenv("ADMIN_USERNAME") ?: "admin",
               "admin_password" => getenv("ADMIN_PASSWORD"),
+              "api_token" => getenv("API_TOKEN"),
+              "eways_api_base" => "https://company.eways.co",
+              "eways_api_version" => "1",
+              "eways_deposit_url" => "https://panel.eways.co",
               "max_video_bytes" => 134217728,
             ];
             file_put_contents("app/config.local.php", "<?php\nreturn " . var_export($config, true) . ";\n");

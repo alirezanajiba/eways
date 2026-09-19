@@ -11,7 +11,7 @@
   <link rel="manifest" href="/admin/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/admin-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/admin-180.png">
-  <link rel="stylesheet" href="/assets/admin.css?v=6">
+  <link rel="stylesheet" href="/assets/admin.css?v=7">
 </head>
 <body>
   <section class="login-shell" id="login-shell">
@@ -75,9 +75,21 @@
     <div class="editor-head"><div><small id="editor-kicker">ویدئوی جدید</small><h2 id="editor-title">افزودن ویدئو</h2></div><button type="button" id="close-editor">×</button></div>
     <form id="video-form">
       <input type="hidden" name="id">
+      <section class="product-source">
+        <b>روش تعریف کالا</b>
+        <div class="source-options">
+          <label><input type="radio" name="source_type" value="manual" checked><span>تعریف مستقل</span></label>
+          <label><input type="radio" name="source_type" value="eways"><span>اتصال به کالای ایویز</span></label>
+        </div>
+        <div class="eways-lookup hidden" id="eways-lookup">
+          <label>کد کالای ایویز<input name="eways_product_id" type="number" inputmode="numeric" min="1" placeholder="کد کالا را وارد کنید"></label>
+          <button type="button" id="lookup-eways-product">استعلام کالا</button>
+          <div class="eways-product-result" id="eways-product-result"></div>
+        </div>
+      </section>
       <div class="field-grid">
         <label class="full">عنوان محصول<span>*</span><input name="title" maxlength="255" required placeholder="مثلا هدفون بی سیم JBQ مدل H68"></label>
-        <label>کد محصول<input name="product_code" maxlength="100" placeholder="SKU یا کد ایویز"></label>
+        <label class="manual-product-field">کد محصول<input name="product_code" maxlength="100" placeholder="SKU یا کد داخلی"></label>
         <label>دسته بندی<select name="category_id" id="product-category"><option value="">بدون دسته بندی</option></select></label>
         <label>برند<input name="brand" maxlength="120" placeholder="مثلا JBQ"></label>
         <label>قیمت فروش (تومان)<input name="price" type="text" inputmode="numeric" class="money-input" required></label>
@@ -127,6 +139,6 @@
     <div class="jalali-card"><div class="jalali-head"><div><small>تاریخ شمسی</small><b>پایان زمان سفارش</b></div><button type="button" id="close-jalali">×</button></div><div class="jalali-date-fields"><label>روز<select id="jalali-day"></select></label><label>ماه<select id="jalali-month"></select></label><label>سال<select id="jalali-year"></select></label></div><div class="jalali-time-fields"><label>ساعت<select id="jalali-hour"></select></label><span>:</span><label>دقیقه<select id="jalali-minute"></select></label></div><div class="jalali-actions"><button type="button" id="confirm-jalali">تایید</button><button type="button" id="clear-jalali">پاک کردن</button><button type="button" id="cancel-jalali">انصراف</button></div></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/admin.js?v=6" defer></script>
+  <script src="/assets/admin.js?v=7" defer></script>
 </body>
 </html>
