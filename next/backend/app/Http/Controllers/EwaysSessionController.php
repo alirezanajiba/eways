@@ -21,7 +21,12 @@ class EwaysSessionController
             '٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
         ]);
 
-        $result = $eways->login($username, $validated['password']);
+        try {
+            $result = $eways->login($username, $validated['password']);
+        } catch (RuntimeException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 401);
+        }
+
         $token = trim((string) ($result['token'] ?? ''));
         $user = $result['userInfo'] ?? (!empty($result['userId']) ? $result : null);
 
@@ -30,7 +35,7 @@ class EwaysSessionController
             if (isset($result['status']) && is_scalar($result['status']) && (string) $result['status'] !== '') {
                 $message .= ' (کد '.(string) $result['status'].')';
             }
-            throw new RuntimeException($message);
+            return response()->json(['ok' => false, 'message' => $message], 401);
         }
 
         $request->session()->regenerate();
