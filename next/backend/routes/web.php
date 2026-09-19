@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\EwaysSessionController;
 use App\Http\Controllers\OrderController;
 use Illuminate\Support\Facades\Route;
@@ -17,4 +18,13 @@ Route::prefix('api/v1')->group(function (): void {
     });
 
     Route::post('/orders', [OrderController::class, 'store']);
+
+    Route::prefix('admin')->group(function (): void {
+        Route::post('/login', [AdminController::class, 'login']);
+        Route::get('/status', [AdminController::class, 'status']);
+        Route::post('/logout', [AdminController::class, 'logout']);
+        Route::post('/eways-product', [AdminController::class, 'ewaysProduct']);
+        Route::get('/videos', [AdminController::class, 'videos']);
+        Route::get('/categories', [AdminController::class, 'categories']);
+    });
 });
