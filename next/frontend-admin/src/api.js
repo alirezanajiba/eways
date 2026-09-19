@@ -1,6 +1,8 @@
+const API_BASE = (import.meta.env.VITE_API_BASE || '/api/v1').replace(/\/$/, '');
+
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
     cache: 'no-store',
     ...options,
@@ -21,14 +23,16 @@ async function request(path, options = {}) {
 }
 
 export const adminApi = {
-  status: () => request('/api/v1/admin/status'),
-  login: (username, password) => request('/api/v1/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  logout: () => request('/api/v1/admin/logout', { method: 'POST', body: '{}' }),
-  videos: () => request('/api/v1/admin/videos'),
-  categories: () => request('/api/v1/admin/categories'),
-  lookupProduct: (productId) => request('/api/v1/admin/eways-product', { method: 'POST', body: JSON.stringify({ product_id: Number(productId) }) }),
-  saveCategory: (payload) => request('/api/v1/admin/categories/save', { method: 'POST', body: JSON.stringify(payload) }),
-  deleteCategory: (id) => request('/api/v1/admin/categories/delete', { method: 'POST', body: JSON.stringify({ id: Number(id) }) }),
-  saveVideo: (formData) => request('/api/v1/admin/videos/save', { method: 'POST', body: formData }),
-  deleteVideo: (id) => request('/api/v1/admin/videos/delete', { method: 'POST', body: JSON.stringify({ id: Number(id) }) }),
+  status: () => request('/admin/status'),
+  login: (username, password) => request('/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => request('/admin/logout', { method: 'POST', body: '{}' }),
+  videos: () => request('/admin/videos'),
+  categories: () => request('/admin/categories'),
+  lookupProduct: (productId) => request('/admin/eways-product', { method: 'POST', body: JSON.stringify({ product_id: Number(productId) }) }),
+  saveCategory: (payload) => request('/admin/categories/save', { method: 'POST', body: JSON.stringify(payload) }),
+  deleteCategory: (id) => request('/admin/categories/delete', { method: 'POST', body: JSON.stringify({ id: Number(id) }) }),
+  saveVideo: (formData) => request('/admin/videos/save', { method: 'POST', body: formData }),
+  deleteVideo: (id) => request('/admin/videos/delete', { method: 'POST', body: JSON.stringify({ id: Number(id) }) }),
 };
+
+export { API_BASE };
