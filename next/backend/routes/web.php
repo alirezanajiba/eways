@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\EwaysSessionController;
 use App\Http\Controllers\OrderController;
@@ -26,5 +27,9 @@ Route::prefix('api/v1')->group(function (): void {
         Route::post('/eways-product', [AdminController::class, 'ewaysProduct']);
         Route::get('/videos', [AdminController::class, 'videos']);
         Route::get('/categories', [AdminController::class, 'categories']);
+        Route::post('/categories/save', [AdminContentController::class, 'saveCategory']);
+        Route::post('/categories/delete', [AdminContentController::class, 'deleteCategory']);
+        Route::post('/videos/save', [AdminContentController::class, 'saveVideo']);
+        Route::post('/videos/delete', [AdminContentController::class, 'deleteVideo']);
     });
 });
