@@ -152,7 +152,10 @@ try {
 
     if ($action === 'eways-login' && $method === 'POST') {
         $data = requestData();
-        $username = trim((string) ($data['username'] ?? ''));
+        $username = strtr(trim((string) ($data['username'] ?? '')), [
+            '۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9',
+            '٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
+        ]);
         $password = (string) ($data['password'] ?? '');
         if ($username === '' || $password === '') {
             jsonResponse(['ok' => false, 'message' => 'نام کاربری و رمز عبور ایویز را وارد کنید.'], 422);
@@ -160,9 +163,7 @@ try {
         $response = ewaysRequest('POST', '/api/service/v{version}/user/login', [
             'userName' => $username,
             'password' => $password,
-            // A generated browser/session identifier can be rejected as an
-            // unknown device. The Panel API explicitly accepts a null value.
-            'info' => null,
+            'info' => 'eways-video-' . substr(hash('sha256', session_id()), 0, 24),
             // This endpoint expects the application token in appKey as well as
             // the Authorization header.
             'appKey' => ewaysApiToken(),
