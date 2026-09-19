@@ -25,7 +25,7 @@ class EwaysApiService
             ->connectTimeout(8)
             ->withHeaders($headers);
 
-        return $token ? $request->withToken($token) : $request;
+        return $token ? $request->withToken(preg_replace('/^Bearer\s+/i', '', trim($token)) ?: $token) : $request;
     }
 
     private function endpoint(string $path): string
@@ -55,15 +55,85 @@ class EwaysApiService
 
     public function profile(string $token): array
     {
-        $response = $this->client($token)->get($this->endpoint('/api/service/v{version}/user/GetProfile'));
-        return $this->normalizeResponse($response->json(), $response->successful(), $response->status());
+        return $this->request('GET', '/api/service/v{version}/user/GetProfile', null, $token);
     }
 
     public function product(int $productId, ?string $token = null): array
     {
-        $request = $token ? $this->client($token) : $this->client((string) config('services.eways.api_token'));
-        $response = $request->get($this->endpoint('/api/service/v{version}/store/GetProduct/'.$productId));
+        return $this->request('GET', '/api/service/v{version}/store/GetProduct/'.$productId, null, $token ?: $this->serverToken());
+    }
+
+    public function basketDetails(array $user, string $token): array
+    {
+        return $this->request('POST', '/api/service/v{version}/store/GetBasketDetails', [
+            'type' => 0,
+            'couponCode' => null,
+            'state' => $user['stateId'] ?? null,
+            'city' => $user['townId'] ?? null,
+        ], $token);
+    }
+
+    public function replaceBasket(array $items, string $token): void
+    {
+        $this->request('GET', '/api/service/v{version}/store/RemoveBasketItems', null, $token);
+
+        foreach ($items as $item) {
+            $productId = (int) ($item['productId'] ?? 0);
+            $count = (int) ($item['count'] ?? 0);
+            if ($productId < 1 || $count < 1) {
+                continue;
+            }
+
+            $result = $this->request('POST', '/api/service/v{version}/store/AddToBasket', [
+                'productId' => $productId,
+                'count' => $count,
+                'categoryId' => null,
+            ], $token);
+
+            if (!array_key_exists('items', $result)) {
+                throw new RuntimeException($this->description($result, 'ساخت سبد خرید ایویز انجام نشد.'));
+            }
+        }
+    }
+
+    public function buy(array $user, array $basket, string $token): array
+    {
+        return $this->request('POST', '/api/service/v{version}/store/Buy', [
+            'type' => (int) ($basket['shippingType'] ?? 0),
+            'deliveryAddress' => $user['address'] ?? '',
+            'description' => 'سفارش ثبت شده از ایویز ویدئو',
+            'couponCode' => null,
+            'gateway' => 0,
+            'gatewayType' => 0,
+            'stateId' => $user['stateId'] ?? null,
+            'cityId' => $user['townId'] ?? null,
+            'zipCode' => $user['postCode'] ?? null,
+            'periodTimeId' => null,
+            'recipientName' => $user['fullName'] ?? trim(($user['firstName'] ?? '').' '.($user['lastName'] ?? '')),
+            'recipientCellPhone' => $user['mobile'] ?? null,
+            'callbackUrl' => null,
+        ], $token);
+    }
+
+    public function description(array $response, string $fallback): string
+    {
+        $description = trim((string) ($response['description'] ?? ''));
+        return $description !== '' ? $description : $fallback;
+    }
+
+    private function request(string $method, string $path, ?array $payload, ?string $token): array
+    {
+        $response = $this->client($token)->send($method, $this->endpoint($path), $payload === null ? [] : ['json' => $payload]);
         return $this->normalizeResponse($response->json(), $response->successful(), $response->status());
+    }
+
+    private function serverToken(): string
+    {
+        $token = preg_replace('/^Bearer\s+/i', '', trim((string) config('services.eways.api_token', ''))) ?? '';
+        if ($token === '') {
+            throw new RuntimeException('توکن وب سرویس ایویز روی سرور تنظیم نشده است.');
+        }
+        return $token;
     }
 
     private function normalizeResponse(mixed $payload, bool $successful, int $statusCode): array
@@ -78,8 +148,17 @@ class EwaysApiService
         }
 
         if (!$successful) {
-            $message = trim((string) ($normalized['description'] ?? $normalized['detail'] ?? $normalized['message'] ?? 'خطا در وب سرویس ایویز'));
-            throw new RuntimeException($message.' (HTTP '.$statusCode.')');
+            $message = trim((string) ($normalized['description'] ?? $normalized['detail'] ?? $normalized['message'] ?? $normalized['title'] ?? 'خطا در وب سرویس ایویز'));
+            if ($message === '' && !empty($normalized['errors']) && is_array($normalized['errors'])) {
+                $parts = [];
+                array_walk_recursive($normalized['errors'], static function (mixed $value) use (&$parts): void {
+                    if (is_scalar($value) && trim((string) $value) !== '') {
+                        $parts[] = trim((string) $value);
+                    }
+                });
+                $message = implode('، ', array_unique($parts));
+            }
+            throw new RuntimeException(($message ?: 'خطا در وب سرویس ایویز').' (HTTP '.$statusCode.')');
         }
 
         return $normalized;
@@ -90,7 +169,6 @@ class EwaysApiService
         if (!is_array($value)) {
             return $value;
         }
-
         if (array_is_list($value)) {
             return array_map(fn ($item) => $this->normalizeKeys($item), $value);
         }
@@ -99,7 +177,6 @@ class EwaysApiService
         foreach ($value as $key => $item) {
             $normalized[is_string($key) ? lcfirst($key) : $key] = $this->normalizeKeys($item);
         }
-
         return $normalized;
     }
 }
