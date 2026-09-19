@@ -179,14 +179,16 @@ try {
         if ($username === '' || $password === '') {
             jsonResponse(['ok' => false, 'message' => 'نام کاربری و رمز عبور ایویز را وارد کنید.'], 422);
         }
+        // The current official Eways Android app uses this seven-field login
+        // contract. The public Swagger still documents the older five fields.
         $response = ewaysRequest('POST', '/api/service/v{version}/user/login', [
-            'userName' => $username,
-            'password' => $password,
-            'info' => 'eways-video-' . substr(hash('sha256', session_id()), 0, 24),
-            // This endpoint expects the application token in appKey as well as
-            // the Authorization header.
-            'appKey' => ewaysApiToken(),
-            'rememberMe' => true,
+            'AppKey' => (string) config('eways_app_key', 'JXZYtqDmdPqpHkYL'),
+            'Info' => ' deviceName : Eways Video Web',
+            'Password' => $password,
+            'RememberMe' => true,
+            'Type' => 8,
+            'UserName' => $username,
+            'TraceCode' => '9A4DFE50-ADD4-4F26-8F90-FEA6691CF415',
         ]);
         $token = trim((string) ($response['token'] ?? ($response['data']['token'] ?? '')));
         $user = $response['userInfo'] ?? ($response['data']['userInfo'] ?? null);
