@@ -3,6 +3,9 @@ DirectoryIndex index.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  # Never expose the Laravel application tree directly.
+  RewriteRule ^\.backend(?:/.*)?$ - [F,L]
+
   # Laravel API only. Static React assets/pages stay directly served by Apache.
   RewriteRule ^api/v1(?:/.*)?$ gateway.php [QSA,L]
   RewriteRule ^up$ gateway.php [QSA,L]
