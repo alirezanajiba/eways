@@ -1,13 +1,13 @@
 const jsonHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' };
+const API_BASE = (import.meta.env.VITE_API_BASE || '/api/v1').replace(/\/$/, '');
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
     cache: 'no-store',
     ...options,
     headers: { ...jsonHeaders, ...(options.headers || {}) },
   });
-
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) {
     const error = new Error(data.message || 'خطا در ارتباط با سرور');
@@ -19,14 +19,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  currentUser: () => request('/api/v1/eways/user', { method: 'GET' }),
-  login: (username, password) => request('/api/v1/eways/login', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  }),
-  logout: () => request('/api/v1/eways/logout', { method: 'POST', body: '{}' }),
-  submitOrder: (items) => request('/api/v1/orders', {
-    method: 'POST',
-    body: JSON.stringify({ items }),
-  }),
+  currentUser: () => request('/eways/user', { method: 'GET' }),
+  login: (username, password) => request('/eways/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => request('/eways/logout', { method: 'POST', body: '{}' }),
+  submitOrder: (items) => request('/orders', { method: 'POST', body: JSON.stringify({ items }) }),
 };
+
+export { API_BASE };
