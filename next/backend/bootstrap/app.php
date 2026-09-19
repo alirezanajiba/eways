@@ -12,8 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // API-first rewrite. CORS/auth middleware will be added per migration phase.
+        // React clients are served from the same trusted origin. Eways auth stays
+        // server-side in an encrypted HttpOnly session cookie.
+        $middleware->validateCsrfTokens(except: [
+            'api/v1/eways/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Centralized API exception mapping will be added as endpoints migrate.
+        // Per-controller errors are intentionally returned as JSON during migration.
     })->create();
