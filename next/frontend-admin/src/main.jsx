@@ -1,116 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { adminApi } from './api';
-
-function Login({ onLogin }) {
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event) {
-    event.preventDefault();
-    setBusy(true);
-    setMessage('');
-    const form = new FormData(event.currentTarget);
-    try {
-      await adminApi.login(form.get('username'), form.get('password'));
-      onLogin();
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} style={{width:'min(420px,100%)',display:'grid',gap:14,padding:28,background:'#fff',borderRadius:24,boxShadow:'0 20px 60px rgba(20,24,40,.10)'}}>
-      <div style={{width:52,height:52,borderRadius:16,display:'grid',placeItems:'center',background:'#111827',color:'#fff',fontWeight:800,fontSize:24}}>E</div>
-      <h1 style={{margin:'4px 0 0'}}>مدیریت EWAYS Next</h1>
-      <p style={{margin:0,color:'#6b7280'}}>نسخه React + Laravel پنل مدیریت</p>
-      <label style={{display:'grid',gap:6}}>نام کاربری<input name="username" autoComplete="username" required style={{padding:12,border:'1px solid #d1d5db',borderRadius:12}} /></label>
-      <label style={{display:'grid',gap:6}}>رمز عبور<input name="password" type="password" autoComplete="current-password" required style={{padding:12,border:'1px solid #d1d5db',borderRadius:12}} /></label>
-      <button disabled={busy} style={{padding:13,border:0,borderRadius:13,background:'#111827',color:'#fff'}}>{busy ? 'در حال ورود...' : 'ورود به مدیریت'}</button>
-      {message && <p style={{margin:0,color:'#b91c1c'}}>{message}</p>}
-    </form>
-  );
-}
-
-function Dashboard({ onLogout }) {
-  const [videos, setVideos] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [lookup, setLookup] = useState(null);
-  const [lookupMessage, setLookupMessage] = useState('');
-
-  useEffect(() => {
-    Promise.all([adminApi.videos(), adminApi.categories()]).then(([v, c]) => {
-      setVideos(v.videos || []);
-      setCategories(c.categories || []);
-    });
-  }, []);
-
-  async function lookupProduct(event) {
-    event.preventDefault();
-    setLookup(null);
-    setLookupMessage('');
-    const id = new FormData(event.currentTarget).get('product_id');
-    try {
-      const data = await adminApi.lookupProduct(id);
-      setLookup(data.product);
-    } catch (error) {
-      setLookupMessage(error.message);
-    }
-  }
-
-  return (
-    <div style={{width:'min(1100px,100%)',padding:24}}>
-      <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,marginBottom:24}}>
-        <div><small style={{color:'#6b7280'}}>EWAYS Video</small><h1 style={{margin:4}}>صفحه مدیریت جدید</h1></div>
-        <button onClick={onLogout} style={{padding:'10px 16px',border:'1px solid #d1d5db',borderRadius:12,background:'#fff'}}>خروج</button>
-      </header>
-
-      <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:14,marginBottom:20}}>
-        <article style={{background:'#fff',padding:18,borderRadius:18}}><span style={{color:'#6b7280'}}>کل ویدئوها</span><b style={{display:'block',fontSize:28}}>{videos.length.toLocaleString('fa-IR')}</b></article>
-        <article style={{background:'#fff',padding:18,borderRadius:18}}><span style={{color:'#6b7280'}}>ویدئوهای فعال</span><b style={{display:'block',fontSize:28}}>{videos.filter(v => Number(v.is_active)).length.toLocaleString('fa-IR')}</b></article>
-        <article style={{background:'#fff',padding:18,borderRadius:18}}><span style={{color:'#6b7280'}}>دسته‌بندی‌ها</span><b style={{display:'block',fontSize:28}}>{categories.length.toLocaleString('fa-IR')}</b></article>
-      </section>
-
-      <section style={{background:'#fff',padding:20,borderRadius:20}}>
-        <h2 style={{marginTop:0}}>استعلام کالای EWAYS</h2>
-        <form onSubmit={lookupProduct} style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          <input name="product_id" type="number" min="1" inputMode="numeric" required placeholder="کد کالای EWAYS" style={{flex:'1 1 240px',padding:12,border:'1px solid #d1d5db',borderRadius:12}} />
-          <button style={{padding:'12px 18px',border:0,borderRadius:12,background:'#111827',color:'#fff'}}>استعلام کالا</button>
-        </form>
-        {lookupMessage && <p style={{color:'#b91c1c'}}>{lookupMessage}</p>}
-        {lookup && <div style={{marginTop:16,padding:16,background:'#f9fafb',borderRadius:14}}><b>{lookup.title || lookup.name || `کالا ${lookup.id}`}</b><pre style={{whiteSpace:'pre-wrap',direction:'ltr',textAlign:'left',fontSize:12,overflow:'auto'}}>{JSON.stringify(lookup,null,2)}</pre></div>}
-      </section>
-    </div>
-  );
-}
-
-function AdminApp() {
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-
-  useEffect(() => {
-    adminApi.status().then(data => setAuthenticated(Boolean(data.authenticated))).finally(() => setLoading(false));
-  }, []);
-
-  async function logout() {
-    await adminApi.logout();
-    setAuthenticated(false);
-  }
-
-  return (
-    <main dir="rtl" style={{minHeight:'100dvh',display:'grid',placeItems:'center',background:'#f6f7fb',color:'#16181d',fontFamily:'Vazirmatn,Tahoma,sans-serif'}}>
-      {loading ? <p>در حال بارگذاری...</p> : authenticated ? <Dashboard onLogout={logout} /> : <Login onLogin={() => setAuthenticated(true)} />}
-    </main>
-  );
-}
-
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <AdminApp />
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+import React,{useEffect,useMemo,useState}from'react';
+import{createRoot}from'react-dom/client';
+import{adminApi}from'./api';
+import'./admin.css';
+const fa=new Intl.NumberFormat('fa-IR');
+const emptyVideo={id:'',source_type:'manual',eways_product_id:'',title:'',product_code:'',category_id:'',brand:'',price:'',shipping_text:'',stock_remaining:0,stock_total:0,timer_end:'',sort_order:0,description:'',is_active:true,remove_poster:false,price_tiers:[]};
+function Login({onLogin}){const[m,setM]=useState(''),[busy,setBusy]=useState(false);async function submit(e){e.preventDefault();setBusy(true);setM('');const f=new FormData(e.currentTarget);try{await adminApi.login(f.get('username'),f.get('password'));onLogin()}catch(x){setM(x.message)}finally{setBusy(false)}}return <main className="login-shell"><form className="card login-card" onSubmit={submit}><div className="logo">E</div><h1>مدیریت ایویز ویدئو</h1><p>نسخه React + Laravel</p><label className="field">نام کاربری<input name="username" required autoComplete="username"/></label><label className="field">رمز عبور<input name="password" type="password" required autoComplete="current-password"/></label><button className="primary" disabled={busy}>{busy?'در حال ورود...':'ورود به مدیریت'}</button>{m&&<div className="message">{m}</div>}</form></main>}
+function CategoryManager({categories,reload}){const[form,setForm]=useState({id:'',name:'',icon_key:'grid',sort_order:0,is_active:true}),[msg,setMsg]=useState('');async function save(e){e.preventDefault();try{await adminApi.saveCategory({...form,id:form.id||null});setForm({id:'',name:'',icon_key:'grid',sort_order:0,is_active:true});setMsg('ذخیره شد');reload()}catch(x){setMsg(x.message)}}async function del(id){if(!confirm('دسته‌بندی حذف شود؟'))return;try{await adminApi.deleteCategory(id);reload()}catch(x){setMsg(x.message)}}return <section className="card panel"><div className="panel-head"><h2>مدیریت دسته‌بندی‌ها</h2></div><form className="category-form" onSubmit={save}><label className="field">نام<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></label><label className="field">ترتیب<input type="number" value={form.sort_order} onChange={e=>setForm({...form,sort_order:e.target.value})}/></label><label className="checkbox"><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form,is_active:e.target.checked})}/> فعال</label><button className="primary">{form.id?'ویرایش':'افزودن'}</button></form>{msg&&<p className="message">{msg}</p>}<div className="list">{categories.map(c=><div className="row" key={c.id}><div><b>{c.name}</b><small> · {fa.format(c.products_count||0)} محصول</small></div><span>{Number(c.is_active)?'فعال':'غیرفعال'}</span><div className="row-actions"><button className="secondary" onClick={()=>setForm({id:c.id,name:c.name,icon_key:c.icon_key||'grid',sort_order:c.sort_order||0,is_active:Boolean(Number(c.is_active))})}>ویرایش</button><button className="danger" onClick={()=>del(c.id)}>حذف</button></div></div>)}</div></section>}
+function VideoModal({video,categories,onClose,onSaved}){const[v,setV]=useState({...emptyVideo,...video,price_tiers:video?.price_tiers||[]}),[lookup,setLookup]=useState(null),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false);function set(k,val){setV(x=>({...x,[k]:val}))}async function lookupProduct(){setMsg('');try{const d=await adminApi.lookupProduct(v.eways_product_id);setLookup(d.product);setV(x=>({...x,title:x.title||d.product?.name||'',brand:d.product?.brandName||x.brand,price:d.product?.price||x.price,stock_remaining:d.product?.stock||x.stock_remaining,stock_total:d.product?.stock||x.stock_total}))}catch(x){setMsg(x.message)}}function tier(i,k,val){setV(x=>({...x,price_tiers:x.price_tiers.map((t,n)=>n===i?{...t,[k]:val}:t)}))}async function save(e){e.preventDefault();setBusy(true);setMsg('');const fd=new FormData(e.currentTarget);fd.set('source_type',v.source_type);fd.set('is_active',v.is_active?'1':'0');if(v.remove_poster)fd.set('remove_poster','1');try{await adminApi.saveVideo(fd);onSaved();onClose()}catch(x){setMsg(x.message)}finally{setBusy(false)}}return <div className="modal-back"><form className="card modal" onSubmit={save}><div className="modal-head"><h2>{v.id?'ویرایش ویدئو':'ویدئوی جدید'}</h2><button type="button" className="close" onClick={onClose}>×</button></div><input type="hidden" name="id" value={v.id||''}/><div className="source"><label><input type="radio" checked={v.source_type==='manual'} onChange={()=>set('source_type','manual')}/> تعریف مستقل</label><label><input type="radio" checked={v.source_type==='eways'} onChange={()=>set('source_type','eways')}/> اتصال به EWAYS</label></div>{v.source_type==='eways'&&<div className="grid2"><label className="field">کد کالای EWAYS<input name="eways_product_id" type="number" value={v.eways_product_id||''} onChange={e=>set('eways_product_id',e.target.value)}/></label><button type="button" className="secondary" onClick={lookupProduct}>استعلام کالا</button>{lookup&&<div className="lookup-result full">{lookup.name||lookup.title||`کالا ${lookup.id}`}</div>}</div>}<div className="grid2"><label className="field full">عنوان<input name="title" value={v.title||''} onChange={e=>set('title',e.target.value)} required/></label>{v.source_type==='manual'&&<label className="field">کد محصول<input name="product_code" value={v.product_code||''} onChange={e=>set('product_code',e.target.value)}/></label>}<label className="field">دسته‌بندی<select name="category_id" value={v.category_id||''} onChange={e=>set('category_id',e.target.value)}><option value="">بدون دسته‌بندی</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label className="field">برند<input name="brand" value={v.brand||''} onChange={e=>set('brand',e.target.value)}/></label><label className="field">قیمت فروش<input name="price" className="money" inputMode="numeric" value={v.price||''} onChange={e=>set('price',e.target.value)}/></label><label className="field">زمان ارسال<input name="shipping_text" value={v.shipping_text||''} onChange={e=>set('shipping_text',e.target.value)}/></label><label className="field">موجودی باقیمانده<input name="stock_remaining" type="number" value={v.stock_remaining||0} onChange={e=>set('stock_remaining',e.target.value)}/></label><label className="field">موجودی اولیه<input name="stock_total" type="number" value={v.stock_total||0} onChange={e=>set('stock_total',e.target.value)}/></label><label className="field">پایان تایمر<input name="timer_end" type="datetime-local" value={(v.timer_end||'').replace(' ','T').slice(0,16)} onChange={e=>set('timer_end',e.target.value)}/></label><label className="field">ترتیب نمایش<input name="sort_order" type="number" value={v.sort_order||0} onChange={e=>set('sort_order',e.target.value)}/></label><label className="field full">توضیحات<textarea name="description" rows="4" value={v.description||''} onChange={e=>set('description',e.target.value)}/></label></div>{v.source_type==='manual'&&<section><div className="panel-head"><h3>قیمت‌گذاری پلکانی</h3><button type="button" className="secondary" onClick={()=>setV(x=>({...x,price_tiers:[...x.price_tiers,{min_qty:'',unit_price:''}]}))}>+ افزودن پله</button></div><div className="tiers">{v.price_tiers.map((t,i)=><div className="tier" key={i}><input name="tier_min_qty[]" type="number" min="1" placeholder="از تعداد" value={t.min_qty} onChange={e=>tier(i,'min_qty',e.target.value)}/><input name="tier_unit_price[]" inputMode="numeric" placeholder="قیمت واحد" value={t.unit_price} onChange={e=>tier(i,'unit_price',e.target.value)}/><button type="button" className="danger" onClick={()=>setV(x=>({...x,price_tiers:x.price_tiers.filter((_,n)=>n!==i)}))}>×</button></div>)}</div></section>}<div className="grid2"><label className="upload">ویدئوی MP4<input name="video_file" type="file" accept="video/mp4"/></label><label className="upload">کاور<input name="poster_file" type="file" accept="image/jpeg,image/png,image/webp"/></label></div>{v.poster_path&&<label className="checkbox"><input type="checkbox" checked={v.remove_poster} onChange={e=>set('remove_poster',e.target.checked)}/> حذف کاور فعلی</label>}<label className="checkbox"><input type="checkbox" checked={v.is_active} onChange={e=>set('is_active',e.target.checked)}/> نمایش در اپ</label>{msg&&<p className="message">{msg}</p>}<div className="actions"><button className="primary" disabled={busy}>{busy?'در حال ذخیره...':'ذخیره ویدئو'}</button><button type="button" className="secondary" onClick={onClose}>انصراف</button></div></form></div>}
+function Dashboard({onLogout}){const[videos,setVideos]=useState([]),[categories,setCategories]=useState([]),[tab,setTab]=useState('videos'),[editing,setEditing]=useState(null),[msg,setMsg]=useState('');async function reload(){try{const[v,c]=await Promise.all([adminApi.videos(),adminApi.categories()]);setVideos(v.videos||[]);setCategories(c.categories||[])}catch(x){setMsg(x.message)}}useEffect(()=>{reload()},[]);async function del(id){if(!confirm('ویدئو حذف شود؟'))return;try{await adminApi.deleteVideo(id);reload()}catch(x){setMsg(x.message)}}return <main className="shell"><div className="dashboard"><header className="main-head"><div><small>ایویز ویدئو</small><h1>صفحه مدیریت</h1></div><div className="actions"><a className="secondary" href="/" target="_blank">مشاهده اپ</a><button className="secondary" onClick={onLogout}>خروج</button></div></header><section className="stats"><article className="card stat"><span>کل ویدئوها</span><b>{fa.format(videos.length)}</b></article><article className="card stat"><span>ویدئوهای فعال</span><b>{fa.format(videos.filter(v=>Number(v.is_active)).length)}</b></article><article className="card stat"><span>دسته‌بندی‌ها</span><b>{fa.format(categories.length)}</b></article></section><div className="tabs"><button className={tab==='videos'?'active':''} onClick={()=>setTab('videos')}>مدیریت ویدئوها</button><button className={tab==='categories'?'active':''} onClick={()=>setTab('categories')}>مدیریت دسته‌بندی‌ها</button></div>{msg&&<p className="message">{msg}</p>}{tab==='categories'?<CategoryManager categories={categories} reload={reload}/>:<section className="card panel"><div className="panel-head"><h2>ویدئوهای ثبت‌شده</h2><button className="primary" onClick={()=>setEditing({...emptyVideo})}>+ افزودن ویدئو</button></div><div className="list">{videos.length?videos.map(v=><article className="row video-row" key={v.id}>{v.poster_path?<img className="thumb" src={v.poster_path}/>:<video className="thumb" src={v.video_path}/>}<div><b>{v.title}</b><div><span className="badge">{v.source_type==='eways'?'EWAYS':'مستقل'}</span><span className={'badge '+(!Number(v.is_active)?'off':'')}>{Number(v.is_active)?'فعال':'غیرفعال'}</span></div><small>{fa.format(Number(v.price||0))} تومان · موجودی {fa.format(Number(v.stock_remaining||0))} · فروش {fa.format(Number(v.sales_count||0))}</small></div><div className="row-actions"><button className="secondary" onClick={()=>setEditing(v)}>ویرایش</button><button className="danger" onClick={()=>del(v.id)}>حذف</button></div></article>):<div className="empty">هنوز ویدئویی ثبت نشده است.</div>}</div></section>}{editing&&<VideoModal video={editing} categories={categories} onClose={()=>setEditing(null)} onSaved={reload}/>}</div></main>}
+function App(){const[loading,setLoading]=useState(true),[auth,setAuth]=useState(false);useEffect(()=>{adminApi.status().then(d=>setAuth(Boolean(d.authenticated))).finally(()=>setLoading(false))},[]);async function logout(){await adminApi.logout();setAuth(false)}return loading?<main className="login-shell">در حال بارگذاری...</main>:auth?<Dashboard onLogout={logout}/>:<Login onLogin={()=>setAuth(true)}/>}
+createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
