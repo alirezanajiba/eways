@@ -160,17 +160,23 @@ try {
         $response = ewaysRequest('POST', '/api/service/v{version}/user/login', [
             'userName' => $username,
             'password' => $password,
-            'info' => 'eways-video-' . substr(hash('sha256', session_id()), 0, 24),
-            // API_Token authenticates this application in the Authorization
-            // header. It is not the user's appKey and must not be duplicated.
-            'appKey' => null,
+            // A generated browser/session identifier can be rejected as an
+            // unknown device. The Panel API explicitly accepts a null value.
+            'info' => null,
+            // This endpoint expects the application token in appKey as well as
+            // the Authorization header.
+            'appKey' => ewaysApiToken(),
             'rememberMe' => true,
         ]);
         $token = trim((string) ($response['token'] ?? ''));
         $user = $response['userInfo'] ?? null;
         if ($token === '' || !is_array($user) || empty($user['userId'])) {
             error_log('Eways login rejected. Status: ' . (string) ($response['status'] ?? 'unknown') . '; Description: ' . (string) ($response['description'] ?? ''));
-            jsonResponse(['ok' => false, 'message' => ewaysDescription($response, 'نام کاربری یا رمز عبور ایویز صحیح نیست.')], 401);
+            $message = ewaysDescription($response, 'نام کاربری یا رمز عبور ایویز صحیح نیست.');
+            if (isset($response['status']) && is_scalar($response['status']) && (string) $response['status'] !== '') {
+                $message .= ' (کد ' . (string) $response['status'] . ')';
+            }
+            jsonResponse(['ok' => false, 'message' => $message], 401);
         }
         session_regenerate_id(true);
         $_SESSION['eways_user_token'] = $token;
