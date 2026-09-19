@@ -161,12 +161,15 @@ try {
             'userName' => $username,
             'password' => $password,
             'info' => 'eways-video-' . substr(hash('sha256', session_id()), 0, 24),
-            'appKey' => ewaysApiToken(),
+            // API_Token authenticates this application in the Authorization
+            // header. It is not the user's appKey and must not be duplicated.
+            'appKey' => null,
             'rememberMe' => true,
         ]);
         $token = trim((string) ($response['token'] ?? ''));
         $user = $response['userInfo'] ?? null;
         if ($token === '' || !is_array($user) || empty($user['userId'])) {
+            error_log('Eways login rejected. Status: ' . (string) ($response['status'] ?? 'unknown') . '; Description: ' . (string) ($response['description'] ?? ''));
             jsonResponse(['ok' => false, 'message' => ewaysDescription($response, 'نام کاربری یا رمز عبور ایویز صحیح نیست.')], 401);
         }
         session_regenerate_id(true);
